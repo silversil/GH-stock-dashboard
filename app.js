@@ -117,7 +117,7 @@ function render() {
     <td class="sizes">${escapeHtml(row.sizes.join(", ") || "—")}</td>
     <td class="number"><strong>${row.qty.toLocaleString("it-IT", { maximumFractionDigits: 2 })}</strong></td>
   </tr>`).join("");
-  ui.emptyState.hidden = rows.length !== 0;
+  ui.emptyState.hidden = !state.sourceBuffer || rows.length !== 0;
   ui.loadMoreButton.hidden = visible.length >= rows.length;
 }
 
