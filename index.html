@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Dashboard delle SKU presenti nei negozi ma assenti dal magazzino centrale PUSH." />
+    <title>Stock Gap · PUSH</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">CONTROLLO GIACENZE</p>
+          <h1>Stock <span>Gap</span></h1>
+          <p class="subtitle">Quello che i negozi hanno e il magazzino PUSH no.</p>
+        </div>
+        <div class="actions">
+          <button class="button button-secondary" id="refreshButton" type="button" aria-label="Rileggi il file Excel caricato" disabled>
+            <span aria-hidden="true">↻</span> Rileggi file
+          </button>
+          <label class="button button-primary" for="fileInput">
+            <span aria-hidden="true">↑</span> Carica nuovo Excel
+          </label>
+          <input id="fileInput" type="file" accept=".xlsx,.xls" hidden />
+        </div>
+      </header>
+
+      <section id="status" class="status info" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <div><strong>Carica il file Excel</strong><p>I dati restano nel browser e non vengono inviati online.</p></div>
+      </section>
+
+      <section class="metrics" aria-label="Riepilogo">
+        <article class="metric"><p>SKU fuori PUSH</p><strong id="skuMetric">—</strong><span>con il filtro attivo</span></article>
+        <article class="metric"><p>Pezzi nei negozi</p><strong id="piecesMetric">—</strong><span>non disponibili in PUSH</span></article>
+        <article class="metric"><p>Negozi</p><strong id="storesMetric">—</strong><span>nel file caricato</span></article>
+        <article class="metric"><p>Ultimo aggiornamento</p><strong id="updatedMetric" class="date-metric">—</strong><span id="fileMetric">smarthub.xlsx</span></article>
+      </section>
+
+      <section class="workspace">
+        <aside class="filters" aria-label="Filtri dashboard">
+          <div class="section-heading"><p class="eyebrow">FILTRI</p><button id="resetButton" type="button">Azzera</button></div>
+          <label for="storeFilter">Negozio</label>
+          <select id="storeFilter"><option value="all">Tutti i negozi</option></select>
+
+          <div class="range-heading"><label for="minPieces">Pezzi minimi</label><output id="minOutput" for="minPieces">1</output></div>
+          <input id="minPieces" type="range" min="1" max="50" step="1" value="1" />
+          <div class="range-scale"><span>1</span><span>50+</span></div>
+
+          <label for="searchInput">Cerca SKU o descrizione</label>
+          <div class="search-wrap"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Es. BOR910…" /></div>
+
+          <label for="sortFilter">Ordina per</label>
+          <select id="sortFilter">
+            <option value="qty-desc">Giacenza: più alta</option>
+            <option value="qty-asc">Giacenza: più bassa</option>
+            <option value="sku-asc">SKU: A–Z</option>
+          </select>
+
+          <div class="legend"><span></span><p><strong>Regola</strong> Sono incluse solo quantità positive nei negozi e quantità PUSH pari a zero o assenti.</p></div>
+        </aside>
+
+        <section class="results" aria-label="Risultati">
+          <div class="results-heading">
+            <div><p class="eyebrow">RISULTATI</p><h2>Disponibili nei negozi, assenti in PUSH</h2></div>
+            <p id="resultCount">0 risultati</p>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>SKU</th><th>Descrizione</th><th>Negozio</th><th>Taglie</th><th class="number">Giacenza</th></tr></thead>
+              <tbody id="resultsBody"></tbody>
+            </table>
+            <div id="emptyState" class="empty" hidden>
+              <div aria-hidden="true">◇</div><h3>Nessun risultato</h3><p>Prova a ridurre il numero minimo di pezzi o a cambiare negozio.</p>
+            </div>
+          </div>
+          <button id="loadMoreButton" class="load-more" type="button" hidden>Mostra altri risultati</button>
+        </section>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
