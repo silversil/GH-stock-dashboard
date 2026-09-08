@@ -1,15 +1,16 @@
-# Stock Gap · PUSH
+# Stock Gap · Magento
 
-Dashboard interattiva per trovare, negozio per negozio, le SKU con giacenza positiva che non sono disponibili nel magazzino centrale **PUSH**.
+Dashboard interattiva per trovare, negozio per negozio, le SKU con giacenza positiva che non risultano nell’inventario centrale esportato da **Magento**.
 
 ## Uso
 
 1. Apri la dashboard online.
-2. Filtra per negozio, quantità minima, SKU o descrizione.
-3. Ordina i risultati per giacenza o SKU.
-4. Usa **Carica nuovo Excel** e scegli `smarthub.xlsx` dal computer.
-5. Il file viene elaborato soltanto nel browser: SKU e giacenze non vengono caricati su GitHub o su altri server.
-6. Dopo aver sostituito il file nella cartella locale, usa di nuovo **Carica nuovo Excel**. Il pulsante **Rileggi file** ricalcola invece il file già selezionato nella sessione corrente.
+2. Carica l’Excel delle giacenze dei negozi.
+3. Carica il CSV Magento che elenca le SKU presenti nel magazzino centrale.
+4. Filtra per negozio, Brand, quantità minima, SKU o descrizione.
+5. Ordina i risultati per giacenza o SKU.
+
+Entrambi i file vengono elaborati soltanto nel browser: SKU e giacenze non vengono caricati su GitHub o su altri server. Per aggiornare i dati basta caricare nuovamente i file.
 
 ## Formato del file
 
@@ -21,7 +22,9 @@ La dashboard legge il primo foglio e riconosce automaticamente colonne equivalen
 - `Descrizione Taglia`
 - `Qtà in stock`
 
-Il magazzino centrale viene riconosciuto quando la descrizione del negozio contiene `PUSH` (anche in codici come `PUSH01`). Le quantità positive e negative sono prima sommate per SKU e negozio; solo i totali netti maggiori di zero vengono mostrati.
+Le righe `PUSH` eventualmente presenti nell’Excel vengono ignorate. Il CSV deve contenere almeno la colonna `SKU`; la colonna `Brand` alimenta il filtro marchio.
+
+Per il confronto, spazi e punti vengono rimossi da entrambi i codici e `OT-` viene rimosso dagli SKU del CSV. La dashboard riconosce match esatti, SKU Magento precedute dal comune prefisso di tre caratteri nell’Excel e, come fallback, SKU Magento contenute nel codice Excel. I match multipli della stessa lunghezza sono considerati ambigui, segnalati e non mostrati come assenze certe.
 
 ## Avvio locale
 

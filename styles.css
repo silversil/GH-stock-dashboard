@@ -16,7 +16,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--wash); color: var(--ink); }
 button, input, select { font: inherit; }
-button, label[for="fileInput"], select, input[type="range"] { cursor: pointer; }
+button, label[for="excelInput"], label[for="csvInput"], select, input[type="range"] { cursor: pointer; }
 .shell { width: min(1480px, calc(100% - 40px)); margin: 0 auto; padding: 38px 0 64px; }
 .topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; margin-bottom: 28px; }
 .eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .16em; }
@@ -30,6 +30,12 @@ h1 span { color: var(--green); font-style: italic; }
 .button-primary { border-color: var(--green); background: var(--green); color: white; }
 .button-primary:hover { background: var(--green-dark); }
 .button-secondary { background: white; color: var(--ink); }
+.button-csv { border-color: #9fb6a8; background: #eaf3ed; color: var(--green-dark); }
+.button-csv:hover { background: #dcebe1; }
+.file-states { display: flex; gap: 10px; margin: -12px 0 18px; }
+.file-states span { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 11px; border: 1px solid var(--line); border-radius: 7px; background: white; font-size: 11px; }
+.file-states strong { white-space: nowrap; }
+.file-states em { max-width: 260px; overflow: hidden; color: var(--muted); font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 .status { display: flex; align-items: center; gap: 12px; min-height: 62px; margin-bottom: 18px; padding: 11px 16px; border: 1px solid #cfe0d5; border-radius: 10px; background: #edf7f0; color: var(--green-dark); }
 .status p { margin: 2px 0 0; font-size: 13px; color: inherit; opacity: .78; }
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #20a369; box-shadow: 0 0 0 5px #d5eee0; }
@@ -40,6 +46,9 @@ h1 span { color: var(--green); font-style: italic; }
 .status.info .status-dot { background: #4685ad; box-shadow: 0 0 0 5px #dceaf3; }
 .status.error { border-color: #efc5c0; background: #fff1ef; color: #9a3028; }
 .status.error .status-dot { background: #c84c43; box-shadow: 0 0 0 5px #f2d6d2; }
+.diagnostics { margin: -8px 0 18px; padding: 11px 15px; border: 1px solid var(--line); border-radius: 9px; background: white; color: var(--muted); font-size: 12px; }
+.diagnostics summary { cursor: pointer; color: var(--green-dark); font-weight: 750; }
+.diagnostics p { margin: 9px 0 0; line-height: 1.55; }
 @keyframes pulse { to { opacity: .35; } }
 .metrics { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
 .metric { min-width: 0; padding: 20px 22px; border-right: 1px solid var(--line); }
@@ -55,8 +64,9 @@ h1 span { color: var(--green); font-style: italic; }
 .filters label { display: block; margin: 22px 0 8px; font-size: 12px; font-weight: 750; }
 .range-heading label { margin-bottom: 6px; }
 .range-heading output { min-width: 32px; padding: 3px 8px; border-radius: 12px; background: var(--ink); color: white; font-size: 12px; font-weight: 800; text-align: center; }
-select, .search-wrap { width: 100%; min-height: 42px; border: 1px solid #ccd7d0; border-radius: 7px; background: white; color: var(--ink); }
+select, input[type="number"], .search-wrap { width: 100%; min-height: 42px; border: 1px solid #ccd7d0; border-radius: 7px; background: white; color: var(--ink); }
 select { padding: 0 34px 0 11px; }
+input[type="number"] { padding: 0 11px; }
 .search-wrap { display: flex; align-items: center; gap: 7px; padding: 0 10px; }
 .search-wrap span { color: var(--muted); font-size: 20px; }
 .search-wrap input { width: 100%; border: 0; outline: 0; background: transparent; }
@@ -98,6 +108,7 @@ td.number strong { display: inline-block; min-width: 40px; padding: 5px 9px; bor
   .shell { width: min(100% - 24px, 1480px); padding-top: 24px; }
   .actions, .button { width: 100%; }
   .button { justify-content: center; }
+  .file-states { flex-direction: column; }
   .metrics { grid-template-columns: 1fr; }
   .metric { border-right: 0; border-bottom: 1px solid var(--line); }
   .metric:last-child { border-bottom: 0; }

@@ -3,8 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Dashboard delle SKU presenti nei negozi ma assenti dal magazzino centrale PUSH." />
-    <title>Stock Gap · PUSH</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <meta name="description" content="Dashboard delle SKU presenti nei negozi ma assenti dall’inventario centrale Magento." />
+    <title>Stock Gap · Magento</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <link rel="stylesheet" href="styles.css" />
@@ -15,27 +16,37 @@
         <div>
           <p class="eyebrow">CONTROLLO GIACENZE</p>
           <h1>Stock <span>Gap</span></h1>
-          <p class="subtitle">Quello che i negozi hanno e il magazzino PUSH no.</p>
+          <p class="subtitle">Quello che i negozi hanno e l’inventario centrale Magento no.</p>
         </div>
         <div class="actions">
-          <button class="button button-secondary" id="refreshButton" type="button" aria-label="Rileggi il file Excel caricato" disabled>
-            <span aria-hidden="true">↻</span> Rileggi file
-          </button>
-          <label class="button button-primary" for="fileInput">
+          <label class="button button-primary" for="excelInput">
             <span aria-hidden="true">↑</span> Carica nuovo Excel
           </label>
-          <input id="fileInput" type="file" accept=".xlsx,.xls" hidden />
+          <input id="excelInput" type="file" accept=".xlsx,.xls" hidden />
+          <label class="button button-csv" for="csvInput">
+            <span aria-hidden="true">＋</span> Carica CSV Magento
+          </label>
+          <input id="csvInput" type="file" accept=".csv,text/csv" hidden />
         </div>
       </header>
 
+      <div class="file-states" aria-label="File caricati">
+        <span><strong>Excel negozi</strong><em id="excelFileState">Da caricare</em></span>
+        <span><strong>CSV centrale</strong><em id="csvFileState">Da caricare</em></span>
+      </div>
+
       <section id="status" class="status info" aria-live="polite">
         <span class="status-dot" aria-hidden="true"></span>
-        <div><strong>Carica il file Excel</strong><p>I dati restano nel browser e non vengono inviati online.</p></div>
+        <div><strong>Carica Excel negozi e CSV Magento</strong><p>I dati restano nel browser e non vengono inviati online.</p></div>
       </section>
+      <details id="diagnosticsPanel" class="diagnostics" hidden>
+        <summary>Dettagli e qualità del matching</summary>
+        <p id="diagnosticsText"></p>
+      </details>
 
       <section class="metrics" aria-label="Riepilogo">
-        <article class="metric"><p>SKU fuori PUSH</p><strong id="skuMetric">—</strong><span>con il filtro attivo</span></article>
-        <article class="metric"><p>Pezzi nei negozi</p><strong id="piecesMetric">—</strong><span>non disponibili in PUSH</span></article>
+        <article class="metric"><p>SKU fuori centrale</p><strong id="skuMetric">—</strong><span>con il filtro attivo</span></article>
+        <article class="metric"><p>Pezzi nei negozi</p><strong id="piecesMetric">—</strong><span>non presenti nel CSV Magento</span></article>
         <article class="metric"><p>Negozi</p><strong id="storesMetric">—</strong><span>nel file caricato</span></article>
         <article class="metric"><p>Ultimo aggiornamento</p><strong id="updatedMetric" class="date-metric">—</strong><span id="fileMetric">Nessun file</span></article>
       </section>
@@ -46,9 +57,11 @@
           <label for="storeFilter">Negozio</label>
           <select id="storeFilter"><option value="all">Tutti i negozi</option></select>
 
-          <div class="range-heading"><label for="minPieces">Pezzi minimi</label><output id="minOutput" for="minPieces">1</output></div>
-          <input id="minPieces" type="range" min="1" max="50" step="1" value="1" />
-          <div class="range-scale"><span>1</span><span>50+</span></div>
+          <label for="brandFilter">Brand</label>
+          <select id="brandFilter"><option value="all">Tutti i brand</option></select>
+
+          <label for="minPieces">Pezzi minimi</label>
+          <input id="minPieces" type="number" min="1" step="1" value="1" inputmode="numeric" />
 
           <label for="searchInput">Cerca SKU o descrizione</label>
           <div class="search-wrap"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Es. BOR910…" /></div>
@@ -60,17 +73,17 @@
             <option value="sku-asc">SKU: A–Z</option>
           </select>
 
-          <div class="legend"><span></span><p><strong>Regola</strong> Sono incluse solo quantità positive nei negozi e quantità PUSH pari a zero o assenti.</p></div>
+          <div class="legend"><span></span><p><strong>Regola</strong> Sono incluse le SKU con quantità positiva nei negozi che non trovano corrispondenza nel CSV Magento. Le righe PUSH dell’Excel sono ignorate.</p></div>
         </aside>
 
         <section class="results" aria-label="Risultati">
           <div class="results-heading">
-            <div><p class="eyebrow">RISULTATI</p><h2>Disponibili nei negozi, assenti in PUSH</h2></div>
+            <div><p class="eyebrow">RISULTATI</p><h2>Disponibili nei negozi, assenti nel CSV Magento</h2></div>
             <p id="resultCount">0 risultati</p>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>SKU</th><th>Descrizione</th><th>Negozio</th><th>Taglie</th><th class="number">Giacenza</th></tr></thead>
+              <thead><tr><th>SKU</th><th>Brand</th><th>Descrizione</th><th>Negozio</th><th>Taglie</th><th class="number">Giacenza</th></tr></thead>
               <tbody id="resultsBody"></tbody>
             </table>
             <div id="emptyState" class="empty" hidden>
@@ -82,7 +95,7 @@
       </section>
     </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
     <script src="app.js"></script>
   </body>
 </html>

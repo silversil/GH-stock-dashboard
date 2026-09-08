@@ -1,4 +1,5 @@
 .site-scaffold/
 node_modules/
 .DS_Store
-smarthub.xlsx
+*.xlsx
+*.csv
