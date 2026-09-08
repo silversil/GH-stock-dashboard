@@ -6,7 +6,7 @@ const state = { excel: null, central: null, rows: [], stores: [], brands: [], di
 const ui = Object.fromEntries([
   "status", "diagnosticsPanel", "diagnosticsText", "excelInput", "csvInput", "excelFileState", "csvFileState", "storeFilter", "brandFilter",
   "matchFilter", "minPieces", "searchInput", "sortFilter", "resetButton", "resultsBody", "emptyState", "resultsTitle",
-  "resultCount", "loadMoreButton", "skuMetric", "piecesMetric", "storesMetric", "updatedMetric", "fileMetric"
+  "resultCount", "exportButton", "loadMoreButton", "skuMetric", "piecesMetric", "storesMetric", "updatedMetric", "fileMetric"
 ].map((id) => [id, document.getElementById(id)]));
 
 function text(value) { return String(value ?? "").trim(); }
@@ -229,6 +229,36 @@ function filteredRows() {
   });
   return rows;
 }
+function exportFilteredRows() {
+  if (!globalThis.XLSX) {
+    setStatus("error", "Esportazione non disponibile", "La libreria Excel non è stata caricata. Controlla la connessione e riprova.");
+    return;
+  }
+  const rows = filteredRows();
+  if (!rows.length) return;
+  try {
+    const data = rows.map((row) => ({
+      "SKU Excel": row.sku,
+      "SKU CSV": row.csvSku,
+      "Brand CSV": row.brand,
+      Descrizione: row.description,
+      Negozio: row.store,
+      Taglie: row.sizes.join(", "),
+      Giacenza: row.qty
+    }));
+    const sheet = XLSX.utils.json_to_sheet(data);
+    sheet["!autofilter"] = { ref: sheet["!ref"] };
+    sheet["!cols"] = [
+      { wch: 24 }, { wch: 24 }, { wch: 22 }, { wch: 48 }, { wch: 30 }, { wch: 22 }, { wch: 12 }
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, "Risultati");
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+    XLSX.writeFile(workbook, `stock-gap-${ui.matchFilter.value}-${stamp}.xlsx`, { compression: true });
+  } catch (error) {
+    setStatus("error", "Esportazione non riuscita", error?.message || "Il browser non è riuscito a creare il file Excel.");
+  }
+}
 function render() {
   const rows = filteredRows();
   const visible = rows.slice(0, state.visible);
@@ -248,6 +278,7 @@ function render() {
     <td class="number"><strong>${row.qty.toLocaleString("it-IT", { maximumFractionDigits: 2 })}</strong></td>
   </tr>`).join("");
   const ready = Boolean(state.excel && state.central);
+  ui.exportButton.disabled = !ready || rows.length === 0;
   ui.emptyState.hidden = !ready || rows.length !== 0;
   ui.loadMoreButton.hidden = visible.length >= rows.length;
 }
@@ -293,6 +324,7 @@ ui.resetButton.addEventListener("click", () => {
   ui.matchFilter.value = "missing"; ui.storeFilter.value = "all"; ui.brandFilter.value = "all"; ui.minPieces.value = "1"; ui.searchInput.value = ""; ui.sortFilter.value = "qty-desc"; state.visible = PAGE_SIZE; populateBrandFilter(); render();
 });
 ui.loadMoreButton.addEventListener("click", () => { state.visible += PAGE_SIZE; render(); });
+ui.exportButton.addEventListener("click", exportFilteredRows);
 
 populateFilters();
 render();

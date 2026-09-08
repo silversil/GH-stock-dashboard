@@ -11,6 +11,7 @@ Dashboard interattiva per trovare, negozio per negozio, le SKU con giacenza posi
 5. Nella vista di verifica confronta direttamente `SKU Excel` e `SKU CSV`; il Brand mostrato proviene esclusivamente dalla riga CSV abbinata.
 6. Filtra per negozio, Brand, quantità minima, SKU o descrizione.
 7. Ordina i risultati per giacenza o SKU.
+8. Premi **Scarica Excel** per esportare tutte le righe che rispettano i filtri attivi, non soltanto quelle già caricate a schermo.
 
 Entrambi i file vengono elaborati soltanto nel browser: SKU e giacenze non vengono caricati su GitHub o su altri server. Per aggiornare i dati basta caricare nuovamente i file.
 
