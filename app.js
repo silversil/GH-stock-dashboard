@@ -5,7 +5,7 @@ const MIN_MATCH_LENGTH = 4;
 const state = { excel: null, central: null, rows: [], stores: [], brands: [], diagnostics: null, visible: PAGE_SIZE };
 const ui = Object.fromEntries([
   "status", "diagnosticsPanel", "diagnosticsText", "excelInput", "csvInput", "excelFileState", "csvFileState", "storeFilter", "brandFilter",
-  "minPieces", "searchInput", "sortFilter", "resetButton", "resultsBody", "emptyState",
+  "matchFilter", "minPieces", "searchInput", "sortFilter", "resetButton", "resultsBody", "emptyState", "resultsTitle",
   "resultCount", "loadMoreButton", "skuMetric", "piecesMetric", "storesMetric", "updatedMetric", "fileMetric"
 ].map((id) => [id, document.getElementById(id)]));
 
@@ -101,7 +101,8 @@ function parseCentralCsv(arrayBuffer, fileName) {
     if (!byLength.has(skuKey.length)) byLength.set(skuKey.length, new Set());
     byLength.get(skuKey.length).add(skuKey);
   }
-  return { fileName, skuMap, byLength, lengths: [...byLength.keys()].sort((a, b) => b - a), sourceRows: raw.length, ignoredEmpty, otRows };
+  const brandConflicts = [...skuMap.values()].filter((item) => item.brands.size > 1).length;
+  return { fileName, skuMap, byLength, lengths: [...byLength.keys()].sort((a, b) => b - a), sourceRows: raw.length, ignoredEmpty, otRows, brandConflicts };
 }
 
 function findCentralMatch(excelSkuKey) {
@@ -111,47 +112,29 @@ function findCentralMatch(excelSkuKey) {
   if (withoutPrefix && skuMap.has(withoutPrefix)) return { key: withoutPrefix, method: "prefix3", ambiguous: [] };
 
   const candidates = new Set();
-  let longest = 0;
   for (const length of lengths) {
-    if (length > excelSkuKey.length || length < longest) continue;
+    if (length > excelSkuKey.length) continue;
     const index = byLength.get(length);
     for (let start = 0; start <= excelSkuKey.length - length; start += 1) {
       const candidate = excelSkuKey.slice(start, start + length);
-      if (index.has(candidate)) {
-        if (length > longest) { candidates.clear(); longest = length; }
-        candidates.add(candidate);
-      }
+      if (index.has(candidate)) candidates.add(candidate);
     }
   }
   if (!candidates.size) return null;
-  const matches = [...candidates].sort();
-  if (matches.length > 1) return { key: null, method: "ambiguous", ambiguous: matches };
-  return { key: matches[0], method: "contains", ambiguous: [] };
+  const matches = [...candidates].sort((a, b) => b.length - a.length || a.localeCompare(b));
+  const mostSpecific = matches[0];
+  const independentMatches = matches.filter((candidate) => !mostSpecific.includes(candidate));
+  if (independentMatches.length) return { key: null, method: "ambiguous", ambiguous: [mostSpecific, ...independentMatches] };
+  return { key: mostSpecific, method: "contains", ambiguous: [] };
 }
 
-function commonBrandFamily(brands) {
-  if (!brands.length) return "";
-  const tokenLists = brands.map((brand) => brand.split(/\s+/));
-  const common = [];
-  for (let i = 0; i < tokenLists[0].length; i += 1) {
-    const token = tokenLists[0][i];
-    if (tokenLists.every((tokens) => tokens[i]?.toLocaleLowerCase("it") === token.toLocaleLowerCase("it"))) common.push(token);
-    else break;
-  }
-  return common.join(" ");
-}
-function resolveBrand(prefix, brandEvidence) {
-  const evidence = brandEvidence.get(prefix);
-  if (evidence?.size) {
-    const brands = [...evidence.keys()].sort((a, b) => a.localeCompare(b, "it"));
-    const samples = [...evidence.values()].reduce((sum, count) => sum + count, 0);
-    if (brands.length === 1 && samples >= 2) return { brand: brands[0], verified: true };
-    const family = commonBrandFamily(brands);
-    if (family) return { brand: `${family} · famiglia`, verified: false };
-  }
-  const safeAliases = { NFC: "The North Face", VAN: "Vans" };
-  if (safeAliases[prefix]) return { brand: safeAliases[prefix], verified: true };
-  return { brand: `Da verificare · ${prefix || "senza prefisso"}`, verified: false };
+function centralSkuLabel(item) {
+  if (!item) return "";
+  const originals = [...item.originals].sort((a, b) => {
+    const otDifference = Number(/OT-/i.test(a)) - Number(/OT-/i.test(b));
+    return otDifference || a.localeCompare(b, "it", { numeric: true });
+  });
+  return `${originals.slice(0, 2).join(" / ")}${originals.length > 2 ? ` / +${originals.length - 2}` : ""}`;
 }
 
 function reconcile() {
@@ -172,7 +155,6 @@ function reconcile() {
   const matchCache = new Map();
   const methods = { exact: 0, prefix3: 0, contains: 0 };
   const ambiguous = [];
-  const brandEvidence = new Map();
 
   for (const row of uniqueSkus.values()) {
     const match = findCentralMatch(row.skuKey);
@@ -180,38 +162,45 @@ function reconcile() {
     if (!match) continue;
     if (!match.key) { ambiguous.push({ sku: row.sku, candidates: match.ambiguous }); continue; }
     methods[match.method] += 1;
-    const position = row.skuKey.indexOf(match.key);
-    const prefix = position >= 0 ? row.skuKey.slice(0, position) : row.skuKey.slice(0, 3);
-    if (prefix) {
-      if (!brandEvidence.has(prefix)) brandEvidence.set(prefix, new Map());
-      for (const brand of state.central.skuMap.get(match.key).brands) {
-        const counts = brandEvidence.get(prefix);
-        counts.set(brand, (counts.get(brand) || 0) + 1);
-      }
-    }
   }
 
-  let unresolvedBrands = 0;
   state.rows = state.excel.rows
-    .filter((row) => !matchCache.get(row.skuKey))
     .map((row) => {
-      const prefix = row.skuKey.slice(0, 3);
-      const resolved = resolveBrand(prefix, brandEvidence);
-      if (!resolved.verified) unresolvedBrands += 1;
-      return { ...row, brand: resolved.brand, brandVerified: resolved.verified, sizes: [...row.sizes].sort((a, b) => a.localeCompare(b, "it", { numeric: true })) };
+      const match = matchCache.get(row.skuKey);
+      const base = { ...row, sizes: [...row.sizes].sort((a, b) => a.localeCompare(b, "it", { numeric: true })) };
+      if (!match) return { ...base, matchStatus: "missing", matchMethod: "", csvSku: "", brand: "" };
+      if (!match.key) {
+        const candidateItems = match.ambiguous.map((key) => state.central.skuMap.get(key));
+        return {
+          ...base,
+          matchStatus: "ambiguous",
+          matchMethod: "ambiguous",
+          csvSku: candidateItems.map(centralSkuLabel).filter(Boolean).join(" / "),
+          brand: ""
+        };
+      }
+      const centralItem = state.central.skuMap.get(match.key);
+      return {
+        ...base,
+        matchStatus: "matched",
+        matchMethod: match.method,
+        csvSku: centralSkuLabel(centralItem),
+        brand: [...centralItem.brands].sort((a, b) => a.localeCompare(b, "it")).join(" / ")
+      };
     });
   state.stores = state.excel.stores;
-  state.brands = [...new Set(state.rows.map((row) => row.brand))].sort((a, b) => a.localeCompare(b, "it"));
-  state.diagnostics = { methods, ambiguous, unresolvedBrands, uniqueExcelSkus: uniqueSkus.size };
+  state.brands = [...new Set(state.rows.filter((row) => row.matchStatus === "matched" && row.brand).map((row) => row.brand))].sort((a, b) => a.localeCompare(b, "it"));
+  state.diagnostics = { methods, ambiguous, uniqueExcelSkus: uniqueSkus.size };
   populateFilters();
 
   const matched = methods.exact + methods.prefix3 + methods.contains;
-  const absentSkus = new Set(state.rows.map((row) => row.skuKey)).size;
-  ui.diagnosticsText.textContent = `${methods.exact.toLocaleString("it-IT")} esatti · ${methods.prefix3.toLocaleString("it-IT")} con prefisso di 3 caratteri · ${methods.contains.toLocaleString("it-IT")} contenuti come varianti · ${absentSkus.toLocaleString("it-IT")} assenti · ${ambiguous.length.toLocaleString("it-IT")} ambigui · ${state.central.otRows.toLocaleString("it-IT")} codici OT- normalizzati · ${unresolvedBrands.toLocaleString("it-IT")} righe con Brand da verificare`;
+  const absentSkus = new Set(state.rows.filter((row) => row.matchStatus === "missing").map((row) => row.skuKey)).size;
+  const exactNote = methods.exact === 0 ? " (normale se l’Excel aggiunge sempre un prefisso)" : "";
+  ui.diagnosticsText.textContent = `Totale riconosciuto: ${matched.toLocaleString("it-IT")} · ${methods.exact.toLocaleString("it-IT")} coincidenze esatte dopo normalizzazione${exactNote} · ${methods.prefix3.toLocaleString("it-IT")} con prefisso di 3 caratteri · ${methods.contains.toLocaleString("it-IT")} contenuti come varianti · ${absentSkus.toLocaleString("it-IT")} assenti · ${ambiguous.length.toLocaleString("it-IT")} ambigui · ${state.central.otRows.toLocaleString("it-IT")} righe CSV con OT- normalizzato · ${state.central.brandConflicts.toLocaleString("it-IT")} SKU CSV con Brand discordanti`;
   ui.diagnosticsPanel.hidden = false;
   if (ambiguous.length) {
     const examples = ambiguous.slice(0, 3).map((item) => item.sku).join(", ");
-    setStatus("warning", `${ambiguous.length} SKU con match ambiguo`, `Escluse per prudenza: ${examples}${ambiguous.length > 3 ? "…" : ""}`);
+    setStatus("warning", `${ambiguous.length} SKU con match ambiguo`, `Separate per prudenza nella vista “Match ambigui”: ${examples}${ambiguous.length > 3 ? "…" : ""}`);
   } else {
     setStatus("success", "Confronto completato", `${matched.toLocaleString("it-IT")} SKU riconosciute nel centrale; nessun match ambiguo. Le righe PUSH dell’Excel sono ignorate.`);
   }
@@ -222,15 +211,16 @@ function reconcile() {
 }
 
 function filters() {
-  return { store: ui.storeFilter.value, brand: ui.brandFilter.value, min: Math.max(1, Number(ui.minPieces.value) || 1), search: ui.searchInput.value.trim().toLocaleLowerCase("it"), sort: ui.sortFilter.value };
+  return { match: ui.matchFilter.value, store: ui.storeFilter.value, brand: ui.brandFilter.value, min: Math.max(1, Number(ui.minPieces.value) || 1), search: ui.searchInput.value.trim().toLocaleLowerCase("it"), sort: ui.sortFilter.value };
 }
 function filteredRows() {
   const active = filters();
   const rows = state.rows.filter((row) =>
+    (active.match === "all" || row.matchStatus === active.match) &&
     (active.store === "all" || row.store === active.store) &&
     (active.brand === "all" || row.brand === active.brand) &&
     row.qty >= active.min &&
-    (!active.search || `${row.sku} ${row.description} ${row.brand}`.toLocaleLowerCase("it").includes(active.search))
+    (!active.search || `${row.sku} ${row.csvSku} ${row.description} ${row.brand}`.toLocaleLowerCase("it").includes(active.search))
   );
   rows.sort((a, b) => {
     if (active.sort === "qty-asc") return a.qty - b.qty || a.sku.localeCompare(b.sku);
@@ -242,13 +232,16 @@ function filteredRows() {
 function render() {
   const rows = filteredRows();
   const visible = rows.slice(0, state.visible);
+  const titles = { missing: "Disponibili nei negozi, assenti nel CSV Magento", matched: "SKU riconosciute: verifica il matching Excel ↔ CSV", ambiguous: "SKU con più possibili corrispondenze", all: "Tutte le SKU dei negozi" };
+  ui.resultsTitle.textContent = titles[ui.matchFilter.value] || titles.missing;
   ui.skuMetric.textContent = new Set(rows.map((row) => row.skuKey)).size.toLocaleString("it-IT");
   ui.piecesMetric.textContent = rows.reduce((sum, row) => sum + row.qty, 0).toLocaleString("it-IT", { maximumFractionDigits: 2 });
   ui.storesMetric.textContent = state.stores.length.toLocaleString("it-IT");
   ui.resultCount.textContent = `${rows.length.toLocaleString("it-IT")} ${rows.length === 1 ? "risultato" : "risultati"}`;
   ui.resultsBody.innerHTML = visible.map((row) => `<tr>
     <td>${escapeHtml(row.sku)}</td>
-    <td>${escapeHtml(row.brand)}</td>
+    <td>${escapeHtml(row.csvSku || "—")}</td>
+    <td>${escapeHtml(row.brand || "—")}</td>
     <td class="description" title="${escapeHtml(row.description)}">${escapeHtml(row.description || "—")}</td>
     <td class="store" title="${escapeHtml(row.store)}">${escapeHtml(compactStore(row.store))}</td>
     <td class="sizes">${escapeHtml(row.sizes.join(", ") || "—")}</td>
@@ -260,11 +253,16 @@ function render() {
 }
 function populateFilters() {
   const currentStore = state.stores.includes(ui.storeFilter.value) ? ui.storeFilter.value : "all";
-  const currentBrand = state.brands.includes(ui.brandFilter.value) ? ui.brandFilter.value : "all";
   ui.storeFilter.innerHTML = `<option value="all">Tutti i negozi</option>${state.stores.map((store) => `<option value="${escapeHtml(store)}">${escapeHtml(compactStore(store))}</option>`).join("")}`;
-  ui.brandFilter.innerHTML = `<option value="all">Tutti i brand</option>${state.brands.map((brand) => `<option value="${escapeHtml(brand)}">${escapeHtml(brand)}</option>`).join("")}`;
   ui.storeFilter.value = currentStore;
+  populateBrandFilter();
+}
+function populateBrandFilter() {
+  const relevantBrands = ui.matchFilter.value === "missing" || ui.matchFilter.value === "ambiguous" ? [] : state.brands;
+  const currentBrand = relevantBrands.includes(ui.brandFilter.value) ? ui.brandFilter.value : "all";
+  ui.brandFilter.innerHTML = `<option value="all">Tutti i brand</option>${relevantBrands.map((brand) => `<option value="${escapeHtml(brand)}">${escapeHtml(brand)}</option>`).join("")}`;
   ui.brandFilter.value = currentBrand;
+  ui.brandFilter.disabled = relevantBrands.length === 0;
 }
 
 ui.excelInput.addEventListener("change", async (event) => {
@@ -289,9 +287,10 @@ ui.csvInput.addEventListener("change", async (event) => {
   } catch (error) { setStatus("error", "CSV Magento non valido", error.message); }
   event.target.value = "";
 });
+ui.matchFilter.addEventListener("input", () => { state.visible = PAGE_SIZE; populateBrandFilter(); render(); });
 [ui.storeFilter, ui.brandFilter, ui.minPieces, ui.searchInput, ui.sortFilter].forEach((control) => control.addEventListener("input", () => { state.visible = PAGE_SIZE; render(); }));
 ui.resetButton.addEventListener("click", () => {
-  ui.storeFilter.value = "all"; ui.brandFilter.value = "all"; ui.minPieces.value = "1"; ui.searchInput.value = ""; ui.sortFilter.value = "qty-desc"; state.visible = PAGE_SIZE; render();
+  ui.matchFilter.value = "missing"; ui.storeFilter.value = "all"; ui.brandFilter.value = "all"; ui.minPieces.value = "1"; ui.searchInput.value = ""; ui.sortFilter.value = "qty-desc"; state.visible = PAGE_SIZE; populateBrandFilter(); render();
 });
 ui.loadMoreButton.addEventListener("click", () => { state.visible += PAGE_SIZE; render(); });
 

@@ -45,8 +45,8 @@
       </details>
 
       <section class="metrics" aria-label="Riepilogo">
-        <article class="metric"><p>SKU fuori centrale</p><strong id="skuMetric">—</strong><span>con il filtro attivo</span></article>
-        <article class="metric"><p>Pezzi nei negozi</p><strong id="piecesMetric">—</strong><span>non presenti nel CSV Magento</span></article>
+        <article class="metric"><p>SKU visualizzate</p><strong id="skuMetric">—</strong><span>con i filtri attivi</span></article>
+        <article class="metric"><p>Pezzi nei negozi</p><strong id="piecesMetric">—</strong><span>nella vista selezionata</span></article>
         <article class="metric"><p>Negozi</p><strong id="storesMetric">—</strong><span>nel file caricato</span></article>
         <article class="metric"><p>Ultimo aggiornamento</p><strong id="updatedMetric" class="date-metric">—</strong><span id="fileMetric">Nessun file</span></article>
       </section>
@@ -54,6 +54,14 @@
       <section class="workspace">
         <aside class="filters" aria-label="Filtri dashboard">
           <div class="section-heading"><p class="eyebrow">FILTRI</p><button id="resetButton" type="button">Azzera</button></div>
+          <label for="matchFilter">Vista</label>
+          <select id="matchFilter">
+            <option value="missing">Assenti nel centrale</option>
+            <option value="matched">Presenti / verifica matching</option>
+            <option value="ambiguous">Match ambigui</option>
+            <option value="all">Tutte le SKU</option>
+          </select>
+
           <label for="storeFilter">Negozio</label>
           <select id="storeFilter"><option value="all">Tutti i negozi</option></select>
 
@@ -63,7 +71,7 @@
           <label for="minPieces">Pezzi minimi</label>
           <input id="minPieces" type="number" min="1" step="1" value="1" inputmode="numeric" />
 
-          <label for="searchInput">Cerca SKU o descrizione</label>
+          <label for="searchInput">Cerca SKU, CSV o descrizione</label>
           <div class="search-wrap"><span aria-hidden="true">⌕</span><input id="searchInput" type="search" placeholder="Es. BOR910…" /></div>
 
           <label for="sortFilter">Ordina per</label>
@@ -73,17 +81,17 @@
             <option value="sku-asc">SKU: A–Z</option>
           </select>
 
-          <div class="legend"><span></span><p><strong>Regola</strong> Sono incluse le SKU con quantità positiva nei negozi che non trovano corrispondenza nel CSV Magento. Le righe PUSH dell’Excel sono ignorate.</p></div>
+          <div class="legend"><span></span><p><strong>Regola</strong> La vista iniziale mostra le SKU con quantità positiva nei negozi che non trovano corrispondenza nel CSV Magento. Usa “Presenti / verifica matching” per controllare SKU CSV e Brand. Le righe PUSH dell’Excel sono ignorate.</p></div>
         </aside>
 
         <section class="results" aria-label="Risultati">
           <div class="results-heading">
-            <div><p class="eyebrow">RISULTATI</p><h2>Disponibili nei negozi, assenti nel CSV Magento</h2></div>
+            <div><p class="eyebrow">RISULTATI</p><h2 id="resultsTitle">Disponibili nei negozi, assenti nel CSV Magento</h2></div>
             <p id="resultCount">0 risultati</p>
           </div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>SKU</th><th>Brand</th><th>Descrizione</th><th>Negozio</th><th>Taglie</th><th class="number">Giacenza</th></tr></thead>
+              <thead><tr><th>SKU Excel</th><th>SKU CSV</th><th>Brand CSV</th><th>Descrizione</th><th>Negozio</th><th>Taglie</th><th class="number">Giacenza</th></tr></thead>
               <tbody id="resultsBody"></tbody>
             </table>
             <div id="emptyState" class="empty" hidden>
