@@ -102,8 +102,9 @@ function parseExcel(arrayBuffer, fileName) {
     const size = sizeCol ? text(row[sizeCol]) : "";
     const barcode = barcodeCol ? text(row[barcodeCol]) : "";
     const detailKey = `${key}\u0000${size}\u0000${barcode}`;
-    const detail = detailGrouped.get(detailKey) || { store, sku, skuKey, size, barcode, qty: 0 };
+    const detail = detailGrouped.get(detailKey) || { store, sku, skuKey, size, barcode, description: "", qty: 0 };
     detail.qty += qty(row[qtyCol]);
+    if (!detail.description && descriptionCol) detail.description = text(row[descriptionCol]);
     detailGrouped.set(detailKey, detail);
   }
   return {
@@ -299,16 +300,17 @@ function exportFilteredRows() {
           taglia: exportSize(row.size),
           barcode: row.barcode,
           giacenza: row.qty,
-          negozio: row.store
+          negozio: row.store,
+          descrizione: row.description
         });
       }
       const parentSku = children[0]?.sku || rows.find((row) => row.skuKey === skuKey)?.sku || skuKey;
-      data.push({ "SKU esploso con i figli": parentSku, taglia: "", barcode: "", giacenza: "", negozio: "" });
+      data.push({ "SKU esploso con i figli": parentSku, taglia: "", barcode: "", giacenza: "", negozio: "", descrizione: "" });
     }
     const sheet = XLSX.utils.json_to_sheet(data);
     sheet["!autofilter"] = { ref: sheet["!ref"] };
     sheet["!cols"] = [
-      { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 12 }, { wch: 42 }
+      { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 12 }, { wch: 42 }, { wch: 52 }
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Risultati");
