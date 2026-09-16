@@ -31,9 +31,14 @@ function normalizeSku(value, removeOt = false) {
   if (removeOt) normalized = normalized.replace(/OT-/g, "");
   return normalized;
 }
+function exportSize(value) {
+  const size = text(value);
+  const halfSize = size.match(/^(\d+)\s*-\s*$/);
+  return halfSize ? `${halfSize[1]}.5` : size;
+}
 function compareSizes(left, right) {
   const describe = (value) => {
-    const label = text(value).toLocaleUpperCase("it").replace(/\s/g, "");
+    const label = exportSize(value).toLocaleUpperCase("it").replace(/\s/g, "");
     const normalized = CLOTHING_SIZE_ALIASES.get(label) || label;
     if (/^\d+(?:[.,]\d+)?$/.test(normalized)) return { category: 0, rank: Number(normalized.replace(",", ".")), label };
     if (CLOTHING_SIZE_ORDER.has(normalized)) return { category: 1, rank: CLOTHING_SIZE_ORDER.get(normalized), label };
@@ -291,7 +296,7 @@ function exportFilteredRows() {
       for (const row of children) {
         data.push({
           "SKU esploso con i figli": row.sku,
-          taglia: row.size,
+          taglia: exportSize(row.size),
           barcode: row.barcode,
           giacenza: row.qty,
           negozio: row.store
