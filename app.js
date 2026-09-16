@@ -51,11 +51,13 @@ function parseExcel(arrayBuffer, fileName) {
   const skuCol = findColumn(headers, [/^articolo$/i, /^sku$/i, /codice.*articolo/i]);
   const descriptionCol = findColumn(headers, [/descrizione.*articolo/i, /^descrizione$/i]);
   const sizeCol = findColumn(headers, [/taglia/i, /^size$/i]);
+  const barcodeCol = findColumn(headers, [/^bcr$/i, /^barcode$/i, /^ean(?:13)?$/i]);
   const qtyCol = findColumn(headers, [/^qt.*stock/i, /giacenza/i, /quantit/i, /^qty$/i]);
   if (!storeCol || !skuCol || !qtyCol) throw new Error("Nell’Excel servono le colonne Negozio, Articolo/SKU e Quantità in stock.");
 
   const stores = new Set();
   const grouped = new Map();
+  const detailGrouped = new Map();
   let ignoredPushRows = 0;
   for (const row of raw) {
     const store = text(row[storeCol]);
@@ -71,8 +73,21 @@ function parseExcel(arrayBuffer, fileName) {
     if (!current.description && descriptionCol) current.description = text(row[descriptionCol]);
     if (sizeCol && text(row[sizeCol])) current.sizes.add(text(row[sizeCol]));
     grouped.set(key, current);
+
+    const size = sizeCol ? text(row[sizeCol]) : "";
+    const barcode = barcodeCol ? text(row[barcodeCol]) : "";
+    const detailKey = `${key}\u0000${size}\u0000${barcode}`;
+    const detail = detailGrouped.get(detailKey) || { store, sku, skuKey, size, barcode, qty: 0 };
+    detail.qty += qty(row[qtyCol]);
+    detailGrouped.set(detailKey, detail);
   }
-  return { fileName, stores: [...stores].sort((a, b) => a.localeCompare(b, "it")), rows: [...grouped.values()].filter((row) => row.qty > 0), ignoredPushRows };
+  return {
+    fileName,
+    stores: [...stores].sort((a, b) => a.localeCompare(b, "it")),
+    rows: [...grouped.values()].filter((row) => row.qty > 0),
+    detailRows: [...detailGrouped.values()].filter((row) => row.qty !== 0),
+    ignoredPushRows
+  };
 }
 
 function parseCentralCsv(arrayBuffer, fileName) {
@@ -237,19 +252,21 @@ function exportFilteredRows() {
   const rows = filteredRows();
   if (!rows.length) return;
   try {
-    const data = rows.map((row) => ({
-      "SKU Excel": row.sku,
-      "SKU CSV": row.csvSku,
-      "Brand CSV": row.brand,
-      Descrizione: row.description,
-      Negozio: row.store,
-      Taglie: row.sizes.join(", "),
-      Giacenza: row.qty
+    const selected = new Map(rows.map((row, index) => [`${row.store}\u0000${row.skuKey}`, index]));
+    const details = state.excel.detailRows
+      .filter((row) => selected.has(`${row.store}\u0000${row.skuKey}`))
+      .sort((a, b) => selected.get(`${a.store}\u0000${a.skuKey}`) - selected.get(`${b.store}\u0000${b.skuKey}`) || a.size.localeCompare(b.size, "it", { numeric: true }));
+    const data = details.map((row) => ({
+      "SKU esploso con i figli": row.sku,
+      taglia: row.size,
+      barcode: row.barcode,
+      giacenza: row.qty,
+      negozio: row.store
     }));
     const sheet = XLSX.utils.json_to_sheet(data);
     sheet["!autofilter"] = { ref: sheet["!ref"] };
     sheet["!cols"] = [
-      { wch: 24 }, { wch: 24 }, { wch: 22 }, { wch: 48 }, { wch: 30 }, { wch: 22 }, { wch: 12 }
+      { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 12 }, { wch: 42 }
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Risultati");

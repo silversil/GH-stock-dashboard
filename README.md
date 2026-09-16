@@ -11,7 +11,7 @@ Dashboard interattiva per trovare, negozio per negozio, le SKU con giacenza posi
 5. Nella vista di verifica confronta direttamente `SKU Excel` e `SKU CSV`; il Brand mostrato proviene esclusivamente dalla riga CSV abbinata.
 6. Filtra per negozio, Brand, quantità minima, SKU o descrizione.
 7. Ordina i risultati per giacenza o SKU.
-8. Premi **Scarica Excel** per esportare tutte le righe che rispettano i filtri attivi, non soltanto quelle già caricate a schermo.
+8. Premi **Scarica Excel** per esportare tutte le righe che rispettano i filtri attivi, non soltanto quelle già caricate a schermo. Le SKU selezionate vengono esplose in una riga per combinazione SKU–taglia–barcode, nelle sole colonne `SKU esploso con i figli`, `taglia`, `barcode`, `giacenza` e `negozio`. I dettagli con giacenza zero sono esclusi; gli eventuali dettagli negativi restano inclusi per riconciliare il totale mostrato dalla dashboard.
 
 Entrambi i file vengono elaborati soltanto nel browser: SKU e giacenze non vengono caricati su GitHub o su altri server. Per aggiornare i dati basta caricare nuovamente i file.
 
@@ -23,6 +23,7 @@ La dashboard legge il primo foglio e riconosce automaticamente colonne equivalen
 - `Articolo` (SKU)
 - `Descrizione Articolo`
 - `Descrizione Taglia`
+- `BCR` (barcode)
 - `Qtà in stock`
 
 Le righe `PUSH` eventualmente presenti nell’Excel vengono ignorate. Il CSV deve contenere almeno la colonna `SKU`; la colonna `Brand` alimenta il filtro marchio.
