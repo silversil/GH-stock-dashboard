@@ -1,6 +1,14 @@
 /* global XLSX */
 const PAGE_SIZE = 100;
 const MIN_MATCH_LENGTH = 4;
+const CLOTHING_SIZE_ORDER = new Map([
+  ["XXS", 0], ["XS", 1], ["S", 2], ["S/M", 2.5], ["M", 3], ["M/L", 3.5], ["L", 4],
+  ["L/XL", 4.5], ["XL", 5], ["XXL", 6], ["3XL", 7], ["4XL", 8]
+]);
+const CLOTHING_SIZE_ALIASES = new Map([
+  ["2XS", "XXS"], ["SM", "S"], ["MD", "M"], ["LG", "L"], ["LXL", "L/XL"],
+  ["2XL", "XXL"], ["XXXL", "3XL"], ["XXXXL", "4XL"]
+]);
 
 const state = { excel: null, central: null, rows: [], stores: [], brands: [], diagnostics: null, visible: PAGE_SIZE };
 const ui = Object.fromEntries([
@@ -22,6 +30,18 @@ function normalizeSku(value, removeOt = false) {
   let normalized = text(value).replace(/\u00a0/g, " ").toLocaleUpperCase("it").replace(/[\s.]/g, "");
   if (removeOt) normalized = normalized.replace(/OT-/g, "");
   return normalized;
+}
+function compareSizes(left, right) {
+  const describe = (value) => {
+    const label = text(value).toLocaleUpperCase("it").replace(/\s/g, "");
+    const normalized = CLOTHING_SIZE_ALIASES.get(label) || label;
+    if (/^\d+(?:[.,]\d+)?$/.test(normalized)) return { category: 0, rank: Number(normalized.replace(",", ".")), label };
+    if (CLOTHING_SIZE_ORDER.has(normalized)) return { category: 1, rank: CLOTHING_SIZE_ORDER.get(normalized), label };
+    return { category: 2, rank: 0, label };
+  };
+  const a = describe(left);
+  const b = describe(right);
+  return a.category - b.category || a.rank - b.rank || a.label.localeCompare(b.label, "it", { numeric: true });
 }
 function escapeHtml(value) {
   return text(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
@@ -252,17 +272,34 @@ function exportFilteredRows() {
   const rows = filteredRows();
   if (!rows.length) return;
   try {
-    const selected = new Map(rows.map((row, index) => [`${row.store}\u0000${row.skuKey}`, index]));
+    const selected = new Set(rows.map((row) => `${row.store}\u0000${row.skuKey}`));
     const details = state.excel.detailRows
-      .filter((row) => selected.has(`${row.store}\u0000${row.skuKey}`))
-      .sort((a, b) => selected.get(`${a.store}\u0000${a.skuKey}`) - selected.get(`${b.store}\u0000${b.skuKey}`) || a.size.localeCompare(b.size, "it", { numeric: true }));
-    const data = details.map((row) => ({
-      "SKU esploso con i figli": row.sku,
-      taglia: row.size,
-      barcode: row.barcode,
-      giacenza: row.qty,
-      negozio: row.store
-    }));
+      .filter((row) => selected.has(`${row.store}\u0000${row.skuKey}`));
+    const detailsBySku = new Map();
+    for (const row of details) {
+      if (!detailsBySku.has(row.skuKey)) detailsBySku.set(row.skuKey, []);
+      detailsBySku.get(row.skuKey).push(row);
+    }
+    const skuOrder = [...new Set(rows.map((row) => row.skuKey))];
+    const data = [];
+    for (const skuKey of skuOrder) {
+      const children = (detailsBySku.get(skuKey) || []).sort((a, b) =>
+        compareSizes(a.size, b.size) ||
+        a.store.localeCompare(b.store, "it") ||
+        a.barcode.localeCompare(b.barcode, "it", { numeric: true })
+      );
+      for (const row of children) {
+        data.push({
+          "SKU esploso con i figli": row.sku,
+          taglia: row.size,
+          barcode: row.barcode,
+          giacenza: row.qty,
+          negozio: row.store
+        });
+      }
+      const parentSku = children[0]?.sku || rows.find((row) => row.skuKey === skuKey)?.sku || skuKey;
+      data.push({ "SKU esploso con i figli": parentSku, taglia: "", barcode: "", giacenza: "", negozio: "" });
+    }
     const sheet = XLSX.utils.json_to_sheet(data);
     sheet["!autofilter"] = { ref: sheet["!ref"] };
     sheet["!cols"] = [
