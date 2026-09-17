@@ -111,7 +111,7 @@ function parseExcel(arrayBuffer, fileName) {
     fileName,
     stores: [...stores].sort((a, b) => a.localeCompare(b, "it")),
     rows: [...grouped.values()].filter((row) => row.qty > 0),
-    detailRows: [...detailGrouped.values()].filter((row) => row.qty !== 0),
+    detailRows: [...detailGrouped.values()],
     ignoredPushRows
   };
 }
