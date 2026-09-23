@@ -1,5 +1,18 @@
 # Stock Gap · Magento
 
+## Dashboard prezzi di acquisto
+
+Apri `pmp.html` oppure il collegamento **Prezzi di acquisto** dalla dashboard originale.
+Carica il CSV Magento e l’Excel negozi: il primo foglio deve contenere `Articolo`/`SKU` e `Costo Uni   PM` (gli spazi nell’intestazione possono variare). Non serve l’anagrafica.
+
+La nuova pagina usa lo stesso codice di matching di Stock Gap. Per ogni SKU Magento calcola la media aritmetica dei PMP numerici delle righe Excel abbinate, senza pesare le quantità e senza filtrare le giacenze. I valori zero partecipano alla media; celle vuote o non numeriche e match ambigui sono esclusi e disponibili in un report scaricabile. Come nella dashboard originale, le righe dei negozi PUSH vengono ignorate.
+
+**Scarica Excel completo** conserva tutte le righe, le colonne, i valori e l’ordine del CSV Magento, inclusi gli SKU duplicati e gli zeri iniziali, aggiungendo `prezzo_acquisto`. Senza PMP valido la cella resta vuota. I filtri riguardano soltanto l’anteprima. Se il CSV contiene già `prezzo_acquisto`, il caricamento richiede il CSV originale per evitare colonne duplicate o sovrascritture implicite. Il calcolo conserva la precisione; l’anteprima mostra fino a sei decimali. I dati vengono elaborati nel browser.
+
+Verifica della logica: `node pmp.test.cjs`.
+
+È supportato anche il formato di `PMP TUTTI NEGOZI.xlsx`: titolo iniziale, intestazioni `Cod`, `Descrizione`, `Esistenza`, `Costo Uni PM` e negozi indicati da righe di separazione. Ogni articolo eredita il negozio della sezione; titoli, righe vuote e separatori non partecipano alla media. Il report delle esclusioni mantiene i numeri di riga originali dell’Excel.
+
 Dashboard interattiva per trovare, negozio per negozio, le SKU con giacenza positiva che non risultano nell’inventario centrale esportato da **Magento**.
 
 ## Uso

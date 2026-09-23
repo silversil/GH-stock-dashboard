@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+    <meta name="description" content="Completa Magento con il prezzo medio di acquisto dei negozi." />
+    <title>Prezzi PMP · Magento</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+<main class="shell">
+<header class="topbar"><div><p class="eyebrow">PREZZI DI ACQUISTO</p><h1>Magento <span>PMP</span></h1><p class="subtitle">Completa il CSV Magento con il prezzo medio dei negozi.</p></div>
+<div class="actions"><a class="button button-secondary" href="index.html">← Stock Gap</a>
+<label class="button button-csv" for="csvInput">＋ Carica CSV Magento</label><input id="csvInput" type="file" accept=".csv,text/csv" hidden>
+<label class="button button-primary" for="excelInput">↑ Carica Excel negozi</label><input id="excelInput" type="file" accept=".xlsx,.xls" hidden></div></header>
+<div class="file-states"><span><strong>CSV Magento</strong><em id="csvFileState">Da caricare</em></span><span><strong>Excel negozi</strong><em id="excelFileState">Da caricare</em></span></div>
+<section id="status" class="status info" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><div><strong>Carica i due file</strong><p>Servono il CSV Magento e l’Excel negozi con Costo Uni PM. I dati restano nel browser.</p></div></section>
+<section class="metrics" aria-label="Riepilogo">
+<article class="metric"><p>Righe Magento</p><strong id="totalMetric">0</strong><span>Tutte conservate nell’export</span></article>
+<article class="metric"><p>Con PMP</p><strong id="matchedMetric">0</strong><span>Prezzo recuperato</span></article>
+<article class="metric"><p>Senza PMP</p><strong id="missingMetric">0</strong><span>Prezzo lasciato vuoto</span></article>
+<article class="metric"><p>Righe escluse</p><strong id="issuesMetric">0</strong><span>Dettaglio nel report negozi</span></article></section>
+<section class="workspace"><aside class="filters" aria-label="Filtri anteprima"><p class="eyebrow">ANTEPRIMA</p>
+<label for="matchFilter">Vista</label><select id="matchFilter"><option value="all">Tutte le righe Magento</option><option value="matched">Con PMP</option><option value="missing">Senza PMP</option></select>
+<label for="searchInput">Cerca SKU Magento o Excel</label><input id="searchInput" type="search" placeholder="Cerca uno SKU…">
+<div class="legend"><span></span><p><strong>Calcolo</strong> Media aritmetica dei PMP validi delle righe abbinate, senza pesare le quantità. Zero è valido. Le righe PUSH sono ignorate, come in Stock Gap. Nessun filtro sulle quantità.</p></div>
+<p>Il download conserva ordine, righe e colonne del CSV e aggiunge <strong>prezzo_acquisto</strong>. I filtri cambiano solo l’anteprima.</p>
+<button id="reportButton" class="button button-secondary" disabled>↓ Report righe escluse</button></aside>
+<section class="results" aria-label="Risultati"><div class="results-heading"><div><p class="eyebrow">RISULTATO</p><h2>Prezzi di acquisto Magento</h2></div><div class="results-actions"><p id="resultCount">0 righe</p><button id="exportButton" class="button button-primary" disabled>↓ Scarica Excel completo</button></div></div>
+<div class="table-wrap"><table><thead><tr><th>SKU Magento</th><th>SKU Excel abbinati</th><th>Negozi</th><th class="number">PMP utilizzati</th><th class="number">prezzo_acquisto</th></tr></thead><tbody id="resultsBody"></tbody></table><div id="emptyState" class="empty"><h3>Nessuna riga da mostrare</h3><p>Carica i file oppure modifica i filtri dell’anteprima.</p></div></div>
+<button id="loadMoreButton" class="load-more" hidden>Mostra altri risultati</button></section></section></main>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+    <script src="shared.js"></script>
+    <script src="pmp-core.js"></script>
+    <script src="pmp.js"></script>
+  </body>
+</html>
