@@ -16,7 +16,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--wash); color: var(--ink); }
 button, input, select { font: inherit; }
-button, label[for="excelInput"], label[for="csvInput"], select, input[type="range"] { cursor: pointer; }
+button, label[for="excelInput"], label[for="csvInput"], label[for="catalogInput"], select, input[type="range"] { cursor: pointer; }
 .shell { width: min(1480px, calc(100% - 40px)); margin: 0 auto; padding: 38px 0 64px; }
 .topbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; margin-bottom: 28px; }
 .eyebrow { margin: 0 0 8px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .16em; }

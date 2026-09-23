@@ -1,18 +1,20 @@
 /* global XLSX */
 const PAGE_SIZE = 100;
 const MIN_MATCH_LENGTH = 4;
+const MAX_EXCEL_DATA_ROWS = 1048575;
 const CLOTHING_SIZE_ORDER = new Map([
   ["XXS", 0], ["XS", 1], ["S", 2], ["S/M", 2.5], ["M", 3], ["M/L", 3.5], ["L", 4],
   ["L/XL", 4.5], ["XL", 5], ["XXL", 6], ["3XL", 7], ["4XL", 8]
 ]);
 const CLOTHING_SIZE_ALIASES = new Map([
   ["2XS", "XXS"], ["SM", "S"], ["MD", "M"], ["LG", "L"], ["LXL", "L/XL"],
-  ["2XL", "XXL"], ["XXXL", "3XL"], ["XXXXL", "4XL"]
+  ["2XL", "XXL"], ["XXXL", "3XL"], ["XXXXL", "4XL"], ["UNI", "OS"],
+  ["ONESIZE", "OS"], ["OSFA", "OS"]
 ]);
 
-const state = { excel: null, central: null, rows: [], stores: [], brands: [], diagnostics: null, visible: PAGE_SIZE };
+const state = { excel: null, central: null, catalog: null, rows: [], stores: [], brands: [], diagnostics: null, visible: PAGE_SIZE };
 const ui = Object.fromEntries([
-  "status", "diagnosticsPanel", "diagnosticsText", "excelInput", "csvInput", "excelFileState", "csvFileState", "storeFilter", "brandFilter",
+  "status", "diagnosticsPanel", "diagnosticsText", "excelInput", "csvInput", "catalogInput", "excelFileState", "csvFileState", "catalogFileState", "storeFilter", "brandFilter",
   "matchFilter", "minPieces", "searchInput", "sortFilter", "resetButton", "resultsBody", "emptyState", "resultsTitle",
   "resultCount", "exportButton", "loadMoreButton", "skuMetric", "piecesMetric", "storesMetric", "updatedMetric", "fileMetric"
 ].map((id) => [id, document.getElementById(id)]));
@@ -31,15 +33,25 @@ function normalizeSku(value, removeOt = false) {
   if (removeOt) normalized = normalized.replace(/OT-/g, "");
   return normalized;
 }
+function catalogSkuKey(value) {
+  return text(value).replace(/\u00a0/g, " ").toLocaleUpperCase("it");
+}
 function exportSize(value) {
-  const size = text(value);
+  const size = text(value).replace(/^=/, "").replace(/\*+$/, "").trim();
   const halfSize = size.match(/^(\d+)\s*-\s*$/);
   return halfSize ? `${halfSize[1]}.5` : size;
+}
+function normalizeSizeKey(value) {
+  const label = exportSize(value).toLocaleUpperCase("it").replace(/\s/g, "");
+  return CLOTHING_SIZE_ALIASES.get(label) || label;
+}
+function normalizeBarcode(value) {
+  return text(value).replace(/^=/, "").replace(/\s/g, "").replace(/\.0$/, "");
 }
 function compareSizes(left, right) {
   const describe = (value) => {
     const label = exportSize(value).toLocaleUpperCase("it").replace(/\s/g, "");
-    const normalized = CLOTHING_SIZE_ALIASES.get(label) || label;
+    const normalized = normalizeSizeKey(value);
     if (/^\d+(?:[.,]\d+)?$/.test(normalized)) return { category: 0, rank: Number(normalized.replace(",", ".")), label };
     if (CLOTHING_SIZE_ORDER.has(normalized)) return { category: 1, rank: CLOTHING_SIZE_ORDER.get(normalized), label };
     return { category: 2, rank: 0, label };
@@ -68,6 +80,28 @@ function firstSheetRows(arrayBuffer) {
   if (!rows.length) throw new Error("Il file non contiene dati.");
   return rows;
 }
+function firstSheetMatrix(arrayBuffer, fileName) {
+  if (!globalThis.XLSX) throw new Error("Libreria di lettura file non disponibile. Controlla la connessione internet e riprova.");
+  let workbook;
+  if (/\.csv$/i.test(fileName)) {
+    const bytes = new Uint8Array(arrayBuffer);
+    let source;
+    if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+      source = new TextDecoder("utf-8").decode(bytes);
+    } else {
+      try { source = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+      catch { source = new TextDecoder("windows-1252").decode(bytes); }
+    }
+    workbook = XLSX.read(source, { type: "string", raw: true, dense: true });
+  } else {
+    workbook = XLSX.read(arrayBuffer, { type: "array", raw: true, dense: true });
+  }
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!sheet) throw new Error("Il file non contiene fogli leggibili.");
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true, blankrows: false });
+  if (!rows.length) throw new Error("Il file non contiene dati.");
+  return rows;
+}
 
 function parseExcel(arrayBuffer, fileName) {
   const raw = firstSheetRows(arrayBuffer);
@@ -90,10 +124,11 @@ function parseExcel(arrayBuffer, fileName) {
     if (!store || !sku) continue;
     if (isPush(store)) { ignoredPushRows += 1; continue; }
     const skuKey = normalizeSku(sku);
-    if (!skuKey) continue;
+    const catalogKey = catalogSkuKey(sku);
+    if (!skuKey || !catalogKey) continue;
     stores.add(store);
-    const key = `${store}\u0000${skuKey}`;
-    const current = grouped.get(key) || { store, sku, skuKey, description: "", sizes: new Set(), qty: 0 };
+    const key = `${store}\u0000${catalogKey}`;
+    const current = grouped.get(key) || { store, sku, skuKey, catalogKey, description: "", sizes: new Set(), qty: 0 };
     current.qty += qty(row[qtyCol]);
     if (!current.description && descriptionCol) current.description = text(row[descriptionCol]);
     if (sizeCol && text(row[sizeCol])) current.sizes.add(text(row[sizeCol]));
@@ -102,7 +137,7 @@ function parseExcel(arrayBuffer, fileName) {
     const size = sizeCol ? text(row[sizeCol]) : "";
     const barcode = barcodeCol ? text(row[barcodeCol]) : "";
     const detailKey = `${key}\u0000${size}\u0000${barcode}`;
-    const detail = detailGrouped.get(detailKey) || { store, sku, skuKey, size, barcode, description: "", qty: 0 };
+    const detail = detailGrouped.get(detailKey) || { store, sku, skuKey, catalogKey, size, barcode, description: "", qty: 0 };
     detail.qty += qty(row[qtyCol]);
     if (!detail.description && descriptionCol) detail.description = text(row[descriptionCol]);
     detailGrouped.set(detailKey, detail);
@@ -146,6 +181,44 @@ function parseCentralCsv(arrayBuffer, fileName) {
   return { fileName, skuMap, byLength, lengths: [...byLength.keys()].sort((a, b) => b - a), sourceRows: raw.length, ignoredEmpty, otRows, brandConflicts };
 }
 
+function parseCatalog(arrayBuffer, fileName) {
+  const matrix = firstSheetMatrix(arrayBuffer, fileName);
+  const headerIndex = matrix.findIndex((row) => {
+    const headers = row.map((value) => text(value).toLocaleUpperCase("it"));
+    return headers.includes("CODICE") && headers.includes("TG") && headers.includes("BARCODE");
+  });
+  if (headerIndex < 0) throw new Error("Nell’anagrafica servono le colonne CODICE, DESCRIPTION, TG e BARCODE.");
+  const headers = matrix[headerIndex].map((value) => text(value).toLocaleUpperCase("it"));
+  const codeCol = headers.indexOf("CODICE");
+  const descriptionCol = headers.indexOf("DESCRIPTION");
+  const sizeCol = headers.indexOf("TG");
+  const barcodeCol = headers.indexOf("BARCODE");
+  if ([codeCol, descriptionCol, sizeCol, barcodeCol].some((index) => index < 0)) {
+    throw new Error("Nell’anagrafica servono le colonne CODICE, DESCRIPTION, TG e BARCODE.");
+  }
+
+  const skuMap = new Map();
+  let sourceRows = 0;
+  for (let rowIndex = headerIndex + 1; rowIndex < matrix.length; rowIndex += 1) {
+    const row = matrix[rowIndex];
+    const originalSku = text(row[codeCol]);
+    if (!originalSku) continue;
+    sourceRows += 1;
+    const skuKey = catalogSkuKey(originalSku);
+    const item = skuMap.get(skuKey) || { sku: originalSku, description: "", children: [] };
+    const description = text(row[descriptionCol]);
+    if (!item.description && description) item.description = description;
+    item.children.push({
+      size: exportSize(row[sizeCol]),
+      sizeKey: normalizeSizeKey(row[sizeCol]),
+      barcode: normalizeBarcode(row[barcodeCol])
+    });
+    skuMap.set(skuKey, item);
+  }
+  if (!skuMap.size) throw new Error("Nessuna SKU leggibile trovata nell’anagrafica.");
+  return { fileName, skuMap, sourceRows };
+}
+
 function findCentralMatch(excelSkuKey) {
   const { skuMap, byLength, lengths } = state.central;
   if (skuMap.has(excelSkuKey)) return { key: excelSkuKey, method: "exact", ambiguous: [] };
@@ -184,7 +257,7 @@ function reconcile() {
   state.visible = PAGE_SIZE;
   if (!state.excel || !state.central) {
     const missing = !state.excel && !state.central ? "Excel negozi e CSV Magento" : !state.excel ? "Excel negozi" : "CSV Magento";
-    setStatus("info", `Carica ${missing}`, "Il confronto parte automaticamente quando entrambi i file sono presenti.");
+    setStatus("info", `Carica ${missing}`, "Il confronto parte con questi due file; l’anagrafica è necessaria per scaricare l’Excel completo.");
     state.stores = state.excel?.stores || [];
     populateFilters();
     render();
@@ -239,15 +312,16 @@ function reconcile() {
   const exactNote = methods.exact === 0 ? " (normale se l’Excel aggiunge sempre un prefisso)" : "";
   ui.diagnosticsText.textContent = `Totale riconosciuto: ${matched.toLocaleString("it-IT")} · ${methods.exact.toLocaleString("it-IT")} coincidenze esatte dopo normalizzazione${exactNote} · ${methods.prefix3.toLocaleString("it-IT")} con prefisso di 3 caratteri · ${methods.contains.toLocaleString("it-IT")} contenuti come varianti · ${absentSkus.toLocaleString("it-IT")} assenti · ${ambiguous.length.toLocaleString("it-IT")} ambigui · ${state.central.otRows.toLocaleString("it-IT")} righe CSV con OT- normalizzato · ${state.central.brandConflicts.toLocaleString("it-IT")} SKU CSV con Brand discordanti`;
   ui.diagnosticsPanel.hidden = false;
+  const catalogNote = state.catalog ? `Anagrafica pronta: ${state.catalog.skuMap.size.toLocaleString("it-IT")} SKU.` : "Carica anche il file anagrafica per abilitare il download Excel.";
   if (ambiguous.length) {
     const examples = ambiguous.slice(0, 3).map((item) => item.sku).join(", ");
-    setStatus("warning", `${ambiguous.length} SKU con match ambiguo`, `Separate per prudenza nella vista “Match ambigui”: ${examples}${ambiguous.length > 3 ? "…" : ""}`);
+    setStatus("warning", `${ambiguous.length} SKU con match ambiguo`, `Separate per prudenza nella vista “Match ambigui”: ${examples}${ambiguous.length > 3 ? "…" : ""}. ${catalogNote}`);
   } else {
-    setStatus("success", "Confronto completato", `${matched.toLocaleString("it-IT")} SKU riconosciute nel centrale; nessun match ambiguo. Le righe PUSH dell’Excel sono ignorate.`);
+    setStatus("success", "Confronto completato", `${matched.toLocaleString("it-IT")} SKU riconosciute nel centrale; nessun match ambiguo. ${catalogNote}`);
   }
   const now = new Date();
   ui.updatedMetric.textContent = new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short" }).format(now);
-  ui.fileMetric.textContent = `${state.excel.fileName} + ${state.central.fileName}`;
+  ui.fileMetric.textContent = [state.excel.fileName, state.central.fileName, state.catalog?.fileName].filter(Boolean).join(" + ");
   render();
 }
 
@@ -275,36 +349,95 @@ function exportFilteredRows() {
     setStatus("error", "Esportazione non disponibile", "La libreria Excel non è stata caricata. Controlla la connessione e riprova.");
     return;
   }
+  if (!state.catalog) {
+    setStatus("error", "Anagrafica non caricata", "Carica il file anagrafica prima di scaricare l’Excel.");
+    return;
+  }
   const rows = filteredRows();
   if (!rows.length) return;
   try {
-    const selected = new Set(rows.map((row) => `${row.store}\u0000${row.skuKey}`));
-    const details = state.excel.detailRows
-      .filter((row) => selected.has(`${row.store}\u0000${row.skuKey}`));
-    const detailsBySku = new Map();
-    for (const row of details) {
-      if (!detailsBySku.has(row.skuKey)) detailsBySku.set(row.skuKey, []);
-      detailsBySku.get(row.skuKey).push(row);
+    const skuOrder = [...new Set(rows.map((row) => row.catalogKey))];
+    const missing = skuOrder.filter((catalogKey) => !state.catalog.skuMap.has(catalogKey));
+    if (missing.length) {
+      const labels = missing.map((catalogKey) => rows.find((row) => row.catalogKey === catalogKey)?.sku || catalogKey);
+      const visibleLabels = labels.slice(0, 25).join(", ");
+      const report = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(report, XLSX.utils.aoa_to_sheet([["SKU non trovata"], ...labels.map((sku) => [sku])]), "SKU mancanti");
+      XLSX.writeFile(report, "sku-non-trovate-anagrafica.xlsx", { compression: true });
+      setStatus("error", `${missing.length.toLocaleString("it-IT")} SKU non trovate nell’anagrafica`, `${visibleLabels}${labels.length > 25 ? ` e altre ${labels.length - 25}` : ""}. Ho scaricato il report completo delle SKU mancanti.`);
+      return;
     }
-    const skuOrder = [...new Set(rows.map((row) => row.skuKey))];
+
+    const selected = new Set(rows.map((row) => `${row.store}\u0000${row.catalogKey}`));
+    const inventoryBySelection = new Map();
+    for (const detail of state.excel.detailRows) {
+      const key = `${detail.store}\u0000${detail.catalogKey}`;
+      if (!selected.has(key)) continue;
+      if (!inventoryBySelection.has(key)) inventoryBySelection.set(key, []);
+      inventoryBySelection.get(key).push(detail);
+    }
+
+    const parentsBySku = new Map();
+    for (const row of rows) {
+      if (!parentsBySku.has(row.catalogKey)) parentsBySku.set(row.catalogKey, []);
+      parentsBySku.get(row.catalogKey).push(row);
+    }
+    const expectedRows = skuOrder.reduce((total, catalogKey) => {
+      const childCount = state.catalog.skuMap.get(catalogKey).children.length;
+      const storeCount = parentsBySku.get(catalogKey).length;
+      return total + (childCount * storeCount) + 1;
+    }, 0);
+    if (expectedRows > MAX_EXCEL_DATA_ROWS) {
+      setStatus("error", "Troppi risultati per un singolo Excel", `${expectedRows.toLocaleString("it-IT")} righe superano il limite di Excel. Restringi i filtri per negozio, brand, SKU o giacenza minima.`);
+      return;
+    }
     const data = [];
-    for (const skuKey of skuOrder) {
-      const children = (detailsBySku.get(skuKey) || []).sort((a, b) =>
+    for (const catalogKey of skuOrder) {
+      const catalogItem = state.catalog.skuMap.get(catalogKey);
+      const children = [...catalogItem.children].sort((a, b) =>
         compareSizes(a.size, b.size) ||
-        a.store.localeCompare(b.store, "it") ||
         a.barcode.localeCompare(b.barcode, "it", { numeric: true })
       );
-      for (const row of children) {
-        data.push({
-          "SKU esploso con i figli": row.sku,
-          taglia: exportSize(row.size),
-          barcode: row.barcode,
-          giacenza: row.qty,
-          negozio: row.store,
-          descrizione: row.description
-        });
+      const childCountBySize = new Map();
+      for (const child of children) childCountBySize.set(child.sizeKey, (childCountBySize.get(child.sizeKey) || 0) + 1);
+      const parents = parentsBySku.get(catalogKey).sort((a, b) => a.store.localeCompare(b.store, "it"));
+      const lookups = new Map();
+      for (const parent of parents) {
+        const inventory = inventoryBySelection.get(`${parent.store}\u0000${parent.catalogKey}`) || [];
+        const byBarcode = new Map();
+        const bySize = new Map();
+        let unclassifiedQuantity = 0;
+        for (const detail of inventory) {
+          const barcode = normalizeBarcode(detail.barcode);
+          const sizeKey = normalizeSizeKey(detail.size);
+          if (sizeKey) bySize.set(sizeKey, (bySize.get(sizeKey) || 0) + detail.qty);
+          else if (!barcode) unclassifiedQuantity += detail.qty;
+          if (barcode) byBarcode.set(barcode, (byBarcode.get(barcode) || 0) + detail.qty);
+        }
+        lookups.set(parent.store, { byBarcode, bySize, unclassifiedQuantity });
       }
-      const parentSku = children[0]?.sku || rows.find((row) => row.skuKey === skuKey)?.sku || skuKey;
+
+      for (const child of children) {
+        for (const parent of parents) {
+          const lookup = lookups.get(parent.store);
+          let quantity = 0;
+          if (child.sizeKey && childCountBySize.get(child.sizeKey) === 1) {
+            quantity = lookup.bySize.get(child.sizeKey) || 0;
+          } else if (child.barcode) {
+            quantity = lookup.byBarcode.get(child.barcode) || 0;
+          }
+          if (children.length === 1) quantity += lookup.unclassifiedQuantity;
+          data.push({
+            "SKU esploso con i figli": parent.sku,
+            taglia: child.size,
+            barcode: child.barcode,
+            giacenza: quantity,
+            negozio: parent.store,
+            descrizione: catalogItem.description || parent.description
+          });
+        }
+      }
+      const parentSku = parents[0]?.sku || catalogKey;
       data.push({ "SKU esploso con i figli": parentSku, taglia: "", barcode: "", giacenza: "", negozio: "", descrizione: "" });
     }
     const sheet = XLSX.utils.json_to_sheet(data);
@@ -339,7 +472,7 @@ function render() {
     <td class="number"><strong>${row.qty.toLocaleString("it-IT", { maximumFractionDigits: 2 })}</strong></td>
   </tr>`).join("");
   const ready = Boolean(state.excel && state.central);
-  ui.exportButton.disabled = !ready || rows.length === 0;
+  ui.exportButton.disabled = !ready || !state.catalog || rows.length === 0;
   ui.emptyState.hidden = !ready || rows.length !== 0;
   ui.loadMoreButton.hidden = visible.length >= rows.length;
 }
@@ -377,6 +510,23 @@ ui.csvInput.addEventListener("change", async (event) => {
     ui.csvFileState.textContent = file.name;
     reconcile();
   } catch (error) { setStatus("error", "CSV Magento non valido", error.message); }
+  event.target.value = "";
+});
+ui.catalogInput.addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  ui.catalogFileState.textContent = "Lettura…";
+  setStatus("loading", "Lettura anagrafica…", file.name);
+  try {
+    const catalog = parseCatalog(await file.arrayBuffer(), file.name);
+    state.catalog = catalog;
+    ui.catalogFileState.textContent = file.name;
+    reconcile();
+  } catch (error) {
+    ui.catalogFileState.textContent = state.catalog?.fileName || "Da caricare";
+    setStatus("error", "Anagrafica non valida", error.message);
+    render();
+  }
   event.target.value = "";
 });
 ui.matchFilter.addEventListener("input", () => { state.visible = PAGE_SIZE; populateBrandFilter(); render(); });

@@ -27,17 +27,22 @@
             <span aria-hidden="true">＋</span> Carica CSV Magento
           </label>
           <input id="csvInput" type="file" accept=".csv,text/csv" hidden />
+          <label class="button button-secondary" for="catalogInput">
+            <span aria-hidden="true">＋</span> Carica anagrafica
+          </label>
+          <input id="catalogInput" type="file" accept=".csv,.xlsx,.xls,text/csv" hidden />
         </div>
       </header>
 
       <div class="file-states" aria-label="File caricati">
         <span><strong>Excel negozi</strong><em id="excelFileState">Da caricare</em></span>
         <span><strong>CSV centrale</strong><em id="csvFileState">Da caricare</em></span>
+        <span><strong>Anagrafica</strong><em id="catalogFileState">Da caricare</em></span>
       </div>
 
       <section id="status" class="status info" aria-live="polite">
         <span class="status-dot" aria-hidden="true"></span>
-        <div><strong>Carica Excel negozi e CSV Magento</strong><p>I dati restano nel browser e non vengono inviati online.</p></div>
+        <div><strong>Carica Excel negozi e CSV Magento</strong><p>Per scaricare l’Excel completo serve anche il file anagrafica. I dati restano nel browser.</p></div>
       </section>
       <details id="diagnosticsPanel" class="diagnostics" hidden>
         <summary>Dettagli e qualità del matching</summary>
@@ -81,7 +86,7 @@
             <option value="sku-asc">SKU: A–Z</option>
           </select>
 
-          <div class="legend"><span></span><p><strong>Regola</strong> La vista iniziale mostra le SKU con quantità positiva nei negozi che non trovano corrispondenza nel CSV Magento. Usa “Presenti / verifica matching” per controllare SKU CSV e Brand. Le righe PUSH dell’Excel sono ignorate.</p></div>
+          <div class="legend"><span></span><p><strong>Regola</strong> La vista iniziale mostra le SKU con quantità positiva nei negozi che non trovano corrispondenza nel CSV Magento. Il download usa l’anagrafica per aggiungere tutte le taglie e i barcode, anche con giacenza zero. Le righe PUSH dell’Excel sono ignorate.</p></div>
         </aside>
 
         <section class="results" aria-label="Risultati">
