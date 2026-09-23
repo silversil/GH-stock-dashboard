@@ -29,7 +29,7 @@ La dashboard legge il primo foglio e riconosce automaticamente colonne equivalen
 
 Le righe `PUSH` eventualmente presenti nell’Excel vengono ignorate. Il CSV deve contenere almeno la colonna `SKU`; la colonna `Brand` alimenta il filtro marchio.
 
-Il file anagrafica può essere CSV o Excel. La dashboard individua anche un’intestazione preceduta da righe titolo e richiede le colonne `CODICE`, `DESCRIPTION`, `TG` e `BARCODE`. I prefissi `=` usati dal CSV e gli asterischi finali sulle taglie vengono rimossi durante l’elaborazione.
+Il file anagrafica può essere CSV o Excel. La dashboard individua anche un’intestazione preceduta da righe titolo e richiede le colonne `CODICE`, `DESCRIPTION`, `TG` e `BARCODE`. I prefissi `=` usati dal CSV e gli asterischi finali sulle taglie vengono rimossi durante l’elaborazione. Le righe anagrafiche senza barcode vengono escluse dall’Excel esportato; la riga padre della SKU resta presente.
 
 Il collegamento tra Excel negozi e anagrafica usa lo SKU esatto senza distinzione tra maiuscole e minuscole. Punti e spazi interni vengono preservati, così codici distinti come `NBLNBML574OB.D` e `NBLNBML574OBD` non vengono fusi.
 

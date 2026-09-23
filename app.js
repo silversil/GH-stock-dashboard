@@ -199,24 +199,36 @@ function parseCatalog(arrayBuffer, fileName) {
 
   const skuMap = new Map();
   let sourceRows = 0;
+  let ignoredMissingBarcode = 0;
   for (let rowIndex = headerIndex + 1; rowIndex < matrix.length; rowIndex += 1) {
     const row = matrix[rowIndex];
     const originalSku = text(row[codeCol]);
     if (!originalSku) continue;
     sourceRows += 1;
     const skuKey = catalogSkuKey(originalSku);
-    const item = skuMap.get(skuKey) || { sku: originalSku, description: "", children: [] };
+    const item = skuMap.get(skuKey) || { sku: originalSku, description: "", children: [], sourceChildCount: 0, sourceChildCountBySize: new Map() };
     const description = text(row[descriptionCol]);
     if (!item.description && description) item.description = description;
+    const size = exportSize(row[sizeCol]);
+    const sizeKey = normalizeSizeKey(row[sizeCol]);
+    item.sourceChildCount += 1;
+    item.sourceChildCountBySize.set(sizeKey, (item.sourceChildCountBySize.get(sizeKey) || 0) + 1);
+    const barcode = normalizeBarcode(row[barcodeCol]);
+    if (!barcode) {
+      ignoredMissingBarcode += 1;
+      skuMap.set(skuKey, item);
+      continue;
+    }
     item.children.push({
-      size: exportSize(row[sizeCol]),
-      sizeKey: normalizeSizeKey(row[sizeCol]),
-      barcode: normalizeBarcode(row[barcodeCol])
+      size,
+      sizeKey,
+      barcode
     });
     skuMap.set(skuKey, item);
   }
   if (!skuMap.size) throw new Error("Nessuna SKU leggibile trovata nell’anagrafica.");
-  return { fileName, skuMap, sourceRows };
+  const skusWithoutExportableChildren = [...skuMap.values()].filter((item) => item.children.length === 0).length;
+  return { fileName, skuMap, sourceRows, ignoredMissingBarcode, skusWithoutExportableChildren };
 }
 
 function findCentralMatch(excelSkuKey) {
@@ -312,7 +324,9 @@ function reconcile() {
   const exactNote = methods.exact === 0 ? " (normale se l’Excel aggiunge sempre un prefisso)" : "";
   ui.diagnosticsText.textContent = `Totale riconosciuto: ${matched.toLocaleString("it-IT")} · ${methods.exact.toLocaleString("it-IT")} coincidenze esatte dopo normalizzazione${exactNote} · ${methods.prefix3.toLocaleString("it-IT")} con prefisso di 3 caratteri · ${methods.contains.toLocaleString("it-IT")} contenuti come varianti · ${absentSkus.toLocaleString("it-IT")} assenti · ${ambiguous.length.toLocaleString("it-IT")} ambigui · ${state.central.otRows.toLocaleString("it-IT")} righe CSV con OT- normalizzato · ${state.central.brandConflicts.toLocaleString("it-IT")} SKU CSV con Brand discordanti`;
   ui.diagnosticsPanel.hidden = false;
-  const catalogNote = state.catalog ? `Anagrafica pronta: ${state.catalog.skuMap.size.toLocaleString("it-IT")} SKU.` : "Carica anche il file anagrafica per abilitare il download Excel.";
+  const catalogNote = state.catalog
+    ? `Anagrafica pronta: ${state.catalog.skuMap.size.toLocaleString("it-IT")} SKU; ${state.catalog.ignoredMissingBarcode.toLocaleString("it-IT")} righe senza barcode escluse; ${state.catalog.skusWithoutExportableChildren.toLocaleString("it-IT")} SKU con sola riga padre.`
+    : "Carica anche il file anagrafica per abilitare il download Excel.";
   if (ambiguous.length) {
     const examples = ambiguous.slice(0, 3).map((item) => item.sku).join(", ");
     setStatus("warning", `${ambiguous.length} SKU con match ambiguo`, `Separate per prudenza nella vista “Match ambigui”: ${examples}${ambiguous.length > 3 ? "…" : ""}. ${catalogNote}`);
@@ -398,8 +412,6 @@ function exportFilteredRows() {
         compareSizes(a.size, b.size) ||
         a.barcode.localeCompare(b.barcode, "it", { numeric: true })
       );
-      const childCountBySize = new Map();
-      for (const child of children) childCountBySize.set(child.sizeKey, (childCountBySize.get(child.sizeKey) || 0) + 1);
       const parents = parentsBySku.get(catalogKey).sort((a, b) => a.store.localeCompare(b.store, "it"));
       const lookups = new Map();
       for (const parent of parents) {
@@ -421,12 +433,12 @@ function exportFilteredRows() {
         for (const parent of parents) {
           const lookup = lookups.get(parent.store);
           let quantity = 0;
-          if (child.sizeKey && childCountBySize.get(child.sizeKey) === 1) {
+          if (child.sizeKey && catalogItem.sourceChildCountBySize.get(child.sizeKey) === 1) {
             quantity = lookup.bySize.get(child.sizeKey) || 0;
           } else if (child.barcode) {
             quantity = lookup.byBarcode.get(child.barcode) || 0;
           }
-          if (children.length === 1) quantity += lookup.unclassifiedQuantity;
+          if (catalogItem.sourceChildCount === 1) quantity += lookup.unclassifiedQuantity;
           data.push({
             "SKU esploso con i figli": parent.sku,
             taglia: child.size,
