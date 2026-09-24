@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 vm.runInThisContext(fs.readFileSync('shared.js', 'utf8'));
 vm.runInThisContext(fs.readFileSync('pmp-core.js', 'utf8'));
 assert.equal(parsePmp('1.234,56'), 1234.56);
+assert.equal(parsePmp('€1,570.00'), 1570);
+assert.equal(parsePmp('€3,258,222.71'), 3258222.71);
 assert.equal(parsePmp('12.3456'), 12.3456);
 assert.equal(parsePmp('0'), 0);
 assert.equal(parsePmp(''), null);

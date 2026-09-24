@@ -3,6 +3,7 @@ function parsePmp(value) {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   let source = text(value).replace(/[\s€]/g, "");
   if (!source) return null;
+  if (/^[+-]?\d{1,3}(?:,\d{3})+\.\d+$/.test(source)) source = source.replace(/,/g, "");
   if (source.includes(",")) {
     if (!/^[+-]?(?:\d+|\d{1,3}(?:\.\d{3})+),\d+$/.test(source)) return null;
     source = source.replace(/\./g, "").replace(",", ".");
