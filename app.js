@@ -320,17 +320,16 @@ function exportFilteredRows() {
   try {
     const skuOrder = [...new Set(rows.map((row) => row.catalogKey))];
     const missing = skuOrder.filter((catalogKey) => !state.catalog.skuMap.has(catalogKey));
-    if (missing.length) {
-      const labels = missing.map((catalogKey) => rows.find((row) => row.catalogKey === catalogKey)?.sku || catalogKey);
-      const visibleLabels = labels.slice(0, 25).join(", ");
-      const report = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(report, XLSX.utils.aoa_to_sheet([["SKU non trovata"], ...labels.map((sku) => [sku])]), "SKU mancanti");
-      XLSX.writeFile(report, "sku-non-trovate-anagrafica.xlsx", { compression: true });
-      setStatus("error", `${missing.length.toLocaleString("it-IT")} SKU non trovate nell’anagrafica`, `${visibleLabels}${labels.length > 25 ? ` e altre ${labels.length - 25}` : ""}. Ho scaricato il report completo delle SKU mancanti.`);
+    const missingSet = new Set(missing);
+    const missingLabels = missing.map((catalogKey) => rows.find((row) => row.catalogKey === catalogKey)?.sku || catalogKey);
+    const foundSkuOrder = skuOrder.filter((catalogKey) => !missingSet.has(catalogKey));
+    const foundRows = rows.filter((row) => !missingSet.has(row.catalogKey));
+    if (missingLabels.length > MAX_EXCEL_DATA_ROWS) {
+      setStatus("error", "Troppe SKU non trovate per un singolo foglio", `${missingLabels.length.toLocaleString("it-IT")} SKU superano il limite di Excel. Restringi i filtri prima di scaricare.`);
       return;
     }
 
-    const selected = new Set(rows.map((row) => `${row.store}\u0000${row.catalogKey}`));
+    const selected = new Set(foundRows.map((row) => `${row.store}\u0000${row.catalogKey}`));
     const inventoryBySelection = new Map();
     for (const detail of state.excel.detailRows) {
       const key = `${detail.store}\u0000${detail.catalogKey}`;
@@ -340,11 +339,11 @@ function exportFilteredRows() {
     }
 
     const parentsBySku = new Map();
-    for (const row of rows) {
+    for (const row of foundRows) {
       if (!parentsBySku.has(row.catalogKey)) parentsBySku.set(row.catalogKey, []);
       parentsBySku.get(row.catalogKey).push(row);
     }
-    const expectedRows = skuOrder.reduce((total, catalogKey) => {
+    const expectedRows = foundSkuOrder.reduce((total, catalogKey) => {
       const childCount = state.catalog.skuMap.get(catalogKey).children.length;
       const storeCount = parentsBySku.get(catalogKey).length;
       return total + (childCount * storeCount) + 1;
@@ -354,7 +353,7 @@ function exportFilteredRows() {
       return;
     }
     const data = [];
-    for (const catalogKey of skuOrder) {
+    for (const catalogKey of foundSkuOrder) {
       const catalogItem = state.catalog.skuMap.get(catalogKey);
       const children = [...catalogItem.children].sort((a, b) =>
         compareSizes(a.size, b.size) ||
@@ -400,15 +399,27 @@ function exportFilteredRows() {
       const parentSku = parents[0]?.sku || catalogKey;
       data.push({ "SKU esploso con i figli": parentSku, taglia: "", barcode: "", giacenza: "", negozio: "", descrizione: "" });
     }
-    const sheet = XLSX.utils.json_to_sheet(data);
+    const resultHeaders = ["SKU esploso con i figli", "taglia", "barcode", "giacenza", "negozio", "descrizione"];
+    const sheet = XLSX.utils.json_to_sheet(data, { header: resultHeaders });
     sheet["!autofilter"] = { ref: sheet["!ref"] };
     sheet["!cols"] = [
       { wch: 30 }, { wch: 14 }, { wch: 18 }, { wch: 12 }, { wch: 42 }, { wch: 52 }
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Risultati");
+    if (missingLabels.length) {
+      const missingSheet = XLSX.utils.aoa_to_sheet([["SKU non trovata"], ...missingLabels.map((sku) => [sku])]);
+      missingSheet["!autofilter"] = { ref: missingSheet["!ref"] };
+      missingSheet["!cols"] = [{ wch: 34 }];
+      XLSX.utils.book_append_sheet(workbook, missingSheet, "SKU non trovate");
+    }
     const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
     XLSX.writeFile(workbook, `stock-gap-${ui.matchFilter.value}-${stamp}.xlsx`, { compression: true });
+    if (missingLabels.length) {
+      setStatus("warning", "Excel creato con SKU non trovate", `${foundSkuOrder.length.toLocaleString("it-IT")} SKU esportate nel foglio Risultati; ${missingLabels.length.toLocaleString("it-IT")} SKU inserite nel foglio SKU non trovate.`);
+    } else {
+      setStatus("success", "Excel creato", `${foundSkuOrder.length.toLocaleString("it-IT")} SKU esportate nel foglio Risultati; nessuna SKU mancante nell’anagrafica.`);
+    }
   } catch (error) {
     setStatus("error", "Esportazione non riuscita", error?.message || "Il browser non è riuscito a creare il file Excel.");
   }
