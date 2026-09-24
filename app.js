@@ -26,7 +26,7 @@ function qty(value) {
   const result = Number(normalized);
   return Number.isFinite(result) ? result : 0;
 }
-function compactStore(value) { return text(value).split(" - ")[0] || text(value); }
+function compactStore(value) { return text(value).split(/\s*-\s*/, 1)[0] || text(value); }
 
 
 function catalogSkuKey(value) {
@@ -43,6 +43,20 @@ function normalizeSizeKey(value) {
 }
 function normalizeBarcode(value) {
   return text(value).replace(/^=/, "").replace(/\s/g, "").replace(/\.0$/, "");
+}
+function groupCatalogChildren(catalogItem) {
+  const grouped = new Map();
+  for (const child of catalogItem.children) {
+    const current = grouped.get(child.barcode) || { barcode: child.barcode, sizes: new Set(), sizeKeys: new Set() };
+    current.sizes.add(child.size);
+    current.sizeKeys.add(child.sizeKey);
+    grouped.set(child.barcode, current);
+  }
+  return [...grouped.values()].map((child) => {
+    const sizes = [...child.sizes].sort(compareSizes);
+    const sizeKeys = [...child.sizeKeys];
+    return { barcode: child.barcode, size: sizes.join(" / "), sizeKey: sizeKeys.length === 1 ? sizeKeys[0] : "" };
+  }).sort((a, b) => compareSizes(a.size, b.size) || a.barcode.localeCompare(b.barcode, "it", { numeric: true }));
 }
 function compareSizes(left, right) {
   const describe = (value) => {
@@ -343,10 +357,10 @@ function exportFilteredRows() {
       if (!parentsBySku.has(row.catalogKey)) parentsBySku.set(row.catalogKey, []);
       parentsBySku.get(row.catalogKey).push(row);
     }
+    const exportChildrenBySku = new Map(foundSkuOrder.map((catalogKey) => [catalogKey, groupCatalogChildren(state.catalog.skuMap.get(catalogKey))]));
     const expectedRows = foundSkuOrder.reduce((total, catalogKey) => {
-      const childCount = state.catalog.skuMap.get(catalogKey).children.length;
-      const storeCount = parentsBySku.get(catalogKey).length;
-      return total + (childCount * storeCount) + 1;
+      const childCount = exportChildrenBySku.get(catalogKey).length;
+      return total + childCount + 1;
     }, 0);
     if (expectedRows > MAX_EXCEL_DATA_ROWS) {
       setStatus("error", "Troppi risultati per un singolo Excel", `${expectedRows.toLocaleString("it-IT")} righe superano il limite di Excel. Restringi i filtri per negozio, brand, SKU o giacenza minima.`);
@@ -355,10 +369,7 @@ function exportFilteredRows() {
     const data = [];
     for (const catalogKey of foundSkuOrder) {
       const catalogItem = state.catalog.skuMap.get(catalogKey);
-      const children = [...catalogItem.children].sort((a, b) =>
-        compareSizes(a.size, b.size) ||
-        a.barcode.localeCompare(b.barcode, "it", { numeric: true })
-      );
+      const children = exportChildrenBySku.get(catalogKey);
       const parents = parentsBySku.get(catalogKey).sort((a, b) => a.store.localeCompare(b.store, "it"));
       const lookups = new Map();
       for (const parent of parents) {
@@ -377,6 +388,9 @@ function exportFilteredRows() {
       }
 
       for (const child of children) {
+        let totalQuantity = 0;
+        const allStoreCodes = new Set();
+        const stockedStoreCodes = new Set();
         for (const parent of parents) {
           const lookup = lookups.get(parent.store);
           let quantity = 0;
@@ -386,15 +400,20 @@ function exportFilteredRows() {
             quantity = lookup.byBarcode.get(child.barcode) || 0;
           }
           if (catalogItem.sourceChildCount === 1) quantity += lookup.unclassifiedQuantity;
-          data.push({
-            "SKU esploso con i figli": parent.sku,
-            taglia: child.size,
-            barcode: child.barcode,
-            giacenza: quantity,
-            negozio: parent.store,
-            descrizione: catalogItem.description || parent.description
-          });
+          totalQuantity += quantity;
+          const storeCode = compactStore(parent.store);
+          allStoreCodes.add(storeCode);
+          if (quantity !== 0) stockedStoreCodes.add(storeCode);
         }
+        const storeCodes = stockedStoreCodes.size ? stockedStoreCodes : allStoreCodes;
+        data.push({
+          "SKU esploso con i figli": parents[0]?.sku || catalogKey,
+          taglia: child.size,
+          barcode: child.barcode,
+          giacenza: totalQuantity,
+          negozio: [...storeCodes].sort((a, b) => a.localeCompare(b, "it", { numeric: true })).join(" + "),
+          descrizione: catalogItem.description || parents[0]?.description || ""
+        });
       }
       const parentSku = parents[0]?.sku || catalogKey;
       data.push({ "SKU esploso con i figli": parentSku, taglia: "", barcode: "", giacenza: "", negozio: "", descrizione: "" });
