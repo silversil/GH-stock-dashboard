@@ -18,7 +18,7 @@ assert.equal(result.push, 1);
 assert.equal(result.issues[1][4], 'Match ambiguo');
 const matrix = pmpExportMatrix(magento, result);
 assert.equal(matrix.length, magento.rows.length + 1);
-assert.deepEqual(matrix[0], [...magento.headers, 'prezzo_acquisto']);
+assert.deepEqual(matrix[0], [...magento.headers, 'PMP NEGOZI']);
 for (let i = 0; i < magento.rows.length; i++) assert.deepEqual(matrix[i + 1].slice(0, -1), magento.rows[i]);
 assert.equal(matrix[3][3], '');
 // Original dashboard still delegates to the same matcher via its default state.
@@ -40,3 +40,25 @@ assert.deepEqual(grouped.sourceRowNumbers, [5, 7]);
 assert.equal(grouped.rows[1][grouped.storeCol], 'OU04 - Negozio due');
 assert.equal(buildPmpResult(magento, grouped).rows[0].price, 15);
 console.log('Grouped PMP report: store sections, source row numbers and cross-store mean passed.');
+const typed = { headers: ['SKU', 'Product Type', 'Prezzo Acquisto'], skuCol: 0, rows: [
+  ['ABCD', 'Configurable Product', '€9.00'],
+  ['ABCD-L', 'Simple Product', '€8.00'],
+  ['ABCD-RED', 'Configurable Product', '€7.00'],
+  ['OT-ABCD-RED-37-5', 'Simple Product', '€6.00'],
+  ['MISSING-S', 'Simple Product', '€5.00'],
+  ['ABCDX-S', 'Simple Product', '€4.00']
+] };
+const typedInventory = { ...inventory, rows: [['XYZABCD', 'Roma', 10], ['XYZABCD', 'Bari', 20], ['XYZABCD-RED', 'Roma', 0]] };
+const typedResult = buildPmpResult(typed, typedInventory);
+const prices = new Map(typedResult.rows.map(row => [row.sku, row.price]));
+assert.equal(prices.get('ABCD-L'), 15);
+assert.equal(prices.get('ABCD'), 15);
+assert.equal(prices.get('OT-ABCD-RED-37-5'), 0);
+assert.equal(prices.get('MISSING-S'), null);
+assert.equal(prices.get('ABCDX-S'), null);
+assert.equal(typedResult.orphanSimpleCount, 2);
+assert.deepEqual(typedResult.rows.map(row => row.kind), ['simple', 'simple', 'simple', 'simple', 'configurable', 'configurable']);
+const typedExport = pmpExportMatrix(typed, typedResult);
+assert.deepEqual(typedExport[0], [...typed.headers, 'PMP NEGOZI']);
+for (const row of typedExport.slice(1)) assert.deepEqual(row.slice(0, -1), typed.rows.find(source => source[0] === row[0]));
+console.log('Configurable inheritance, longest parent, orphan handling, zero price, original columns and type Z-A ordering passed.');

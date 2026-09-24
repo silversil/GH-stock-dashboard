@@ -11,10 +11,29 @@ function parsePmp(value) {
   return Number.isFinite(number) ? number : null;
 }
 
+function productKind(value) {
+  const label = text(value).toLowerCase();
+  if (/^(configurable product|configurable|configurabile)$/.test(label)) return "configurable";
+  if (/^(simple product|simple|semplice)$/.test(label)) return "simple";
+  return "other";
+}
+
+function parentSkuKey(sku, parents) {
+  const key = normalizeSku(sku, true);
+  // Scan separator boundaries from right to left, preserving hyphens in parent SKUs.
+  for (let end = key.lastIndexOf("-"); end > 0; end = key.lastIndexOf("-", end - 1)) {
+    const candidate = key.slice(0, end);
+    if (end < key.length - 1 && parents.has(candidate)) return candidate;
+  }
+  return null;
+}
+
 function buildPmpResult(magento, inventory) {
+  const typeCol = magento.headers.findIndex((header) => /^product\s*type$/i.test(text(header)));
   const skuMap = new Map();
   const byLength = new Map();
   for (const row of magento.rows) {
+    if (typeCol >= 0 && productKind(row[typeCol]) !== "configurable") continue;
     const key = normalizeSku(row[magento.skuCol], true);
     if (key.length < 4) continue;
     skuMap.set(key, true);
@@ -47,12 +66,15 @@ function buildPmpResult(magento, inventory) {
     totals.set(match.key, item);
   });
   const rows = magento.rows.map((row) => {
-    const item = totals.get(normalizeSku(row[magento.skuCol], true));
-    return { source: row, sku: text(row[magento.skuCol]), price: item ? item.mean : null, count: item?.count || 0, stores: [...(item?.stores || [])], skus: [...(item?.skus || [])] };
+    const kind = typeCol < 0 ? "configurable" : productKind(row[typeCol]);
+    const key = kind === "simple" ? parentSkuKey(row[magento.skuCol], skuMap) : kind === "configurable" ? normalizeSku(row[magento.skuCol], true) : null;
+    const item = totals.get(key);
+    return { source: row, sku: text(row[magento.skuCol]), kind, parentKey: kind === "simple" ? key : null, price: item ? item.mean : null, count: item?.count || 0, stores: [...(item?.stores || [])], skus: [...(item?.skus || [])] };
   });
-  return { rows, issues, push };
+  if (typeCol >= 0) rows.sort((a, b) => text(b.source[typeCol]).localeCompare(text(a.source[typeCol]), "it"));
+  return { rows, issues, push, orphanSimpleCount: rows.filter((row) => row.kind === "simple" && !row.parentKey).length };
 }
 
 function pmpExportMatrix(magento, result) {
-  return [[...magento.headers, "prezzo_acquisto"], ...result.rows.map((row) => [...Array.from({ length: magento.headers.length }, (_, i) => row.source[i] ?? ""), row.price ?? ""])];
+  return [[...magento.headers, "PMP NEGOZI"], ...result.rows.map((row) => [...Array.from({ length: magento.headers.length }, (_, i) => row.source[i] ?? ""), row.price ?? ""])];
 }

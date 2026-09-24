@@ -13,7 +13,7 @@ function parseSource(matrix, kind) {
   const headerIndex = matrix.findIndex((row) => row.some((v) => skuTest.test(text(v))) && (kind === "magento" || row.some((v) => priceTest.test(text(v)))));
   if (headerIndex < 0) throw new Error(kind === "magento" ? "Nel CSV serve la colonna SKU." : "Nell’Excel servono Articolo/SKU e Costo Uni PM.");
   const headers = matrix[headerIndex];
-  if (kind === "magento" && headers.some((v) => text(v).toLowerCase() === "prezzo_acquisto")) throw new Error("Il CSV contiene già prezzo_acquisto. Carica il CSV originale senza questa colonna.");
+  if (kind === "magento" && headers.some((v) => text(v).toUpperCase() === "PMP NEGOZI")) throw new Error("Il CSV contiene già PMP NEGOZI. Carica il CSV originale senza questa colonna.");
   let rows = matrix.slice(headerIndex + 1);
   if (!rows.length) throw new Error("Il file non contiene righe dati.");
   if (rows.some((row) => row.length > headers.length)) throw new Error("Sono presenti righe con più colonne delle intestazioni: verifica il file.");
@@ -75,7 +75,7 @@ for (const [id, kind, label] of [["csvInput", "magento", "csvFileState"], ["exce
       if (pmpState.magento && pmpState.inventory) {
         pmpState.result = buildPmpResult(pmpState.magento, pmpState.inventory);
         pmpState.visible = 100;
-        status(pmpState.result.issues.length ? "warning" : "success", "Elaborazione completata", `${pmpState.result.issues.length} righe negozi escluse e disponibili nel report; ${pmpState.result.push} righe PUSH ignorate. Il download include tutte le righe Magento, indipendentemente dai filtri.`);
+        status(pmpState.result.issues.length || pmpState.result.orphanSimpleCount ? "warning" : "success", "Elaborazione completata", `${pmpState.result.issues.length} righe negozi escluse e disponibili nel report; ${pmpState.result.push} righe PUSH ignorate. ${pmpState.result.orphanSimpleCount} semplici senza configurabile nel CSV: PMP vuoto. Il download include tutte le righe Magento, ordinate per Product Type da Z ad A.`);
       } else status("info", "Carica il secondo file", "Servono il CSV Magento e l’Excel negozi con Costo Uni PM.");
     } catch (error) {
       el(label).textContent = "File non valido";
