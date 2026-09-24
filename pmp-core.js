@@ -71,10 +71,18 @@ function buildPmpResult(magento, inventory) {
     const item = totals.get(key);
     return { source: row, sku: text(row[magento.skuCol]), kind, parentKey: kind === "simple" ? key : null, price: item ? item.mean : null, count: item?.count || 0, stores: [...(item?.stores || [])], skus: [...(item?.skus || [])] };
   });
-  if (typeCol >= 0) rows.sort((a, b) => text(b.source[typeCol]).localeCompare(text(a.source[typeCol]), "it"));
+  if (typeCol >= 0) {
+    const groupKey = (row) => row.parentKey || normalizeSku(row.sku, true);
+    rows.sort((a, b) => groupKey(b).localeCompare(groupKey(a), "it") ||
+      Number(a.kind === "configurable") - Number(b.kind === "configurable") ||
+      b.sku.localeCompare(a.sku, "it"));
+  }
   return { rows, issues, push, orphanSimpleCount: rows.filter((row) => row.kind === "simple" && !row.parentKey).length };
 }
 
 function pmpExportMatrix(magento, result) {
-  return [[...magento.headers, "PMP NEGOZI"], ...result.rows.map((row) => [...Array.from({ length: magento.headers.length }, (_, i) => row.source[i] ?? ""), row.price ?? ""])];
+  return [[...magento.headers, "PMP NEGOZI"], ...result.rows.map((row) => [...Array.from({ length: magento.headers.length }, (_, i) => {
+    const value = row.source[i] ?? "";
+    return i >= 2 && i <= 5 ? parsePmp(value) ?? value : value;
+  }), row.price ?? ""])];
 }

@@ -75,7 +75,7 @@ for (const [id, kind, label] of [["csvInput", "magento", "csvFileState"], ["exce
       if (pmpState.magento && pmpState.inventory) {
         pmpState.result = buildPmpResult(pmpState.magento, pmpState.inventory);
         pmpState.visible = 100;
-        status(pmpState.result.issues.length || pmpState.result.orphanSimpleCount ? "warning" : "success", "Elaborazione completata", `${pmpState.result.issues.length} righe negozi escluse e disponibili nel report; ${pmpState.result.push} righe PUSH ignorate. ${pmpState.result.orphanSimpleCount} semplici senza configurabile nel CSV: PMP vuoto. Il download include tutte le righe Magento, ordinate per Product Type da Z ad A.`);
+        status(pmpState.result.issues.length || pmpState.result.orphanSimpleCount ? "warning" : "success", "Elaborazione completata", `${pmpState.result.issues.length} righe negozi escluse e disponibili nel report; ${pmpState.result.push} righe PUSH ignorate. ${pmpState.result.orphanSimpleCount} semplici senza configurabile nel CSV: PMP vuoto. Il download include tutte le righe Magento, raggruppate per SKU da Z ad A, con ogni configurabile subito sotto i suoi figli.`);
       } else status("info", "Carica il secondo file", "Servono il CSV Magento e l’Excel negozi con Costo Uni PM.");
     } catch (error) {
       el(label).textContent = "File non valido";
@@ -91,6 +91,10 @@ function download(matrix, name, sheetName, priceCol = -1) {
     if (priceCol >= 0) for (let r = 1; r < matrix.length; r++) {
       const cell = sheet[XLSX.utils.encode_cell({ r, c: priceCol })];
       if (cell?.t === "n") cell.z = "0.00####";
+      for (let c = 2; c <= 5 && c < priceCol; c++) {
+        const numericCell = sheet[XLSX.utils.encode_cell({ r, c })];
+        if (numericCell?.t === "n") numericCell.z = "0.00####";
+      }
     }
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, sheetName);

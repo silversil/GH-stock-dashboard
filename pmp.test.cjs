@@ -57,8 +57,12 @@ assert.equal(prices.get('OT-ABCD-RED-37-5'), 0);
 assert.equal(prices.get('MISSING-S'), null);
 assert.equal(prices.get('ABCDX-S'), null);
 assert.equal(typedResult.orphanSimpleCount, 2);
-assert.deepEqual(typedResult.rows.map(row => row.kind), ['simple', 'simple', 'simple', 'simple', 'configurable', 'configurable']);
+assert.deepEqual(typedResult.rows.map(row => row.kind), ['simple', 'simple', 'simple', 'configurable', 'simple', 'configurable']);
 const typedExport = pmpExportMatrix(typed, typedResult);
 assert.deepEqual(typedExport[0], [...typed.headers, 'PMP NEGOZI']);
-for (const row of typedExport.slice(1)) assert.deepEqual(row.slice(0, -1), typed.rows.find(source => source[0] === row[0]));
+for (const row of typedExport.slice(1)) { const source = typed.rows.find(source => source[0] === row[0]); assert.deepEqual(row.slice(0, -1), [source[0], source[1], parsePmp(source[2])]); }
 console.log('Configurable inheritance, longest parent, orphan handling, zero price, original columns and type Z-A ordering passed.');
+
+const money = pmpExportMatrix({headers:['SKU','Margine','C','D','E','F']}, {rows:[{source:['001','47.81%','€12.80','€1.234,56','','€0.00'],price:10}]});
+assert.deepEqual(money[1], ['001','47.81%',12.8,1234.56,'',0,10]);
+for (const parent of typedResult.rows.filter(r=>r.kind==='configurable')) { const children=typedResult.rows.filter(r=>r.parentKey===normalizeSku(parent.sku,true)); const end=typedResult.rows.indexOf(parent); assert.deepEqual(typedResult.rows.slice(end-children.length,end),children); }
