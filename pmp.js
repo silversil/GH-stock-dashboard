@@ -83,9 +83,26 @@ for (const [id, kind, label] of [["csvInput", "magento", "csvFileState"], ["exce
     } finally { pmpState.loading--; event.target.value = ""; renderPmp(); }
   });
 }
-function download(matrix, name, sheetName, priceCol = -1) {
+async function download(matrix, name, sheetName, priceCol = -1) {
   try {
     if (matrix.length > 1048576 || matrix[0].length > 16384) throw new Error("I dati superano i limiti di un foglio Excel.");
+    if (priceCol >= 0) {
+      pmpState.loading++;
+      renderPmp();
+      try {
+        const book = createPmpWorkbook(matrix, sheetName, priceCol);
+        const buffer = await book.xlsx.writeBuffer();
+        const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } finally { pmpState.loading--; renderPmp(); }
+      return;
+    }
     const sheet = XLSX.utils.aoa_to_sheet(matrix);
     sheet["!autofilter"] = { ref: sheet["!ref"] };
     if (priceCol >= 0) for (let r = 1; r < matrix.length; r++) {

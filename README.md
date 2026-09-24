@@ -59,3 +59,5 @@ python -m http.server 8000
 ```
 
 Poi apri `http://localhost:8000`.
+
+L’Excel PMP blocca prima riga e prima colonna (riquadri fissi da B2), presenta le intestazioni in grassetto e colora tutta la colonna K di giallo #FFFF00. L’esportazione formattata usa ExcelJS 4.4.0 incluso in vendor con licenza MIT.

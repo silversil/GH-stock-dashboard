@@ -1,0 +1,25 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+global.ExcelJS = require('./vendor/exceljs.min.js');
+vm.runInThisContext(fs.readFileSync('pmp-export.js', 'utf8'));
+(async () => {
+  const matrix = [['SKU','Margine','C','D','E','F','Data','Qty','Type','Tipologia','PMP NEGOZI'], ['001','10%',12.8,0,'',1570,'2026-09-24',1,'Simple Product','',20], ['parent','','','','','','',0,'Configurable Product','','']];
+  const book = createPmpWorkbook(matrix, 'Magento', 10);
+  const buffer = await book.xlsx.writeBuffer();
+  const reopened = new ExcelJS.Workbook();
+  await reopened.xlsx.load(buffer);
+  const sheet = reopened.getWorksheet('Magento');
+  assert.equal(sheet.views[0].state, 'frozen');
+  assert.equal(sheet.views[0].xSplit, 1);
+  assert.equal(sheet.views[0].ySplit, 1);
+  assert.equal(sheet.views[0].topLeftCell, 'B2');
+  for (let c = 1; c <= 11; c++) assert.equal(sheet.getCell(1, c).font.bold, true);
+  assert.equal(sheet.getColumn(11).fill.fgColor.argb, 'FFFFFF00');
+  for (let r = 1; r <= 3; r++) assert.equal(sheet.getCell(r, 11).fill.fgColor.argb, 'FFFFFF00');
+  assert.equal(sheet.getCell('C2').value, 12.8);
+  assert.equal(sheet.getCell('C2').numFmt, '0.00####');
+  assert.equal(sheet.getCell('A2').value, '001');
+  assert.equal(sheet.rowCount, 3);
+  console.log('XLSX round-trip: frozen B2, bold header, yellow column K including blanks, numeric prices and SKU preserved.');
+})().catch(error => { console.error(error); process.exitCode = 1; });
