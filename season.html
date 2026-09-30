@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Dashboard stagione · Magento</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="season.css">
+</head>
+<body>
+<main class="shell">
+  <header class="topbar">
+    <div><p class="eyebrow">MAGENTO × BESTSTORE</p><h1>Dashboard <span>stagione</span></h1><p class="subtitle">Confronta le stagioni e scarica gli articoli da aggiornare.</p></div>
+    <div class="actions">
+      <a class="button button-secondary" href="index.html">Stock Gap</a>
+      <a class="button button-secondary" href="pmp.html">Prezzi di acquisto</a>
+      <label class="button button-csv" for="csvInput">＋ CSV Magento</label><input id="csvInput" type="file" accept=".csv,text/csv" hidden>
+      <label class="button button-primary" for="excelInput">↑ Excel BestStore</label><input id="excelInput" type="file" accept=".xlsx,.xls" hidden>
+    </div>
+  </header>
+  <div class="file-states"><span><strong>Magento</strong><em id="csvFileState">Da caricare</em></span><span><strong>BestStore</strong><em id="excelFileState">Da caricare</em></span></div>
+  <section id="status" class="status info" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><div><strong>Carica i due file</strong><p>I dati vengono elaborati solo nel browser. L’Excel viene letto dalla riga 3: B = SKU, E = anno, F = stagione.</p></div></section>
+  <section class="metrics" aria-label="Riepilogo confronto">
+    <article class="metric"><p>Coincidono</p><strong id="matchedMetric">0</strong><span>Stagione già corretta</span></article>
+    <article class="metric"><p>Da aggiornare</p><strong id="mismatchMetric">0</strong><span>Inclusi nel CSV da scaricare</span></article>
+    <article class="metric"><p>Da verificare</p><strong id="unresolvedMetric">0</strong><span>Stagione non determinabile</span></article>
+    <article class="metric"><p>Articoli esclusi</p><strong id="excludedMetric">0</strong><span>OUTLET-SS, OUTLET-FW e CORE</span></article>
+  </section>
+  <section class="workspace">
+    <aside class="filters" aria-label="Filtri risultati">
+      <p class="eyebrow">CONFRONTO STAGIONI</p>
+      <label for="matchFilter">Vista</label><select id="matchFilter"><option value="all">Tutti gli articoli</option><option value="mismatch">Da aggiornare</option><option value="matched">Coincidono</option><option value="unresolved">Da verificare</option></select>
+      <label for="searchInput">Cerca SKU Magento o BestStore</label><div class="search-wrap"><input id="searchInput" type="search" placeholder="Cerca uno SKU…"></div>
+      <div class="legend"><span></span><p><strong>Conversione stagione</strong><br>I e A → FW · E e S → SS.<br>Anno 23 + I → FW23.</p></div>
+      <p class="season-note">Nel confronto i prefissi Magento <strong>MAIN-</strong> e <strong>PRE-</strong> vengono ignorati: MAIN-SS22 e PRE-SS22 equivalgono a SS22.</p>
+      <p class="season-note">Il download contiene tutti gli articoli da aggiornare, anche quelli fuori dai filtri: tutte le colonne originali del CSV, con <strong>SEASON BST</strong> aggiunta in penultima posizione. Season Drop conserva il valore originale, inclusi i prefissi.</p>
+      <p class="season-note">SKU ordinati da Z ad A, con i semplici sopra il relativo configurabile. Senza un match diretto, i semplici ereditano la stagione del padre presente nel CSV.</p>
+      <p class="season-note">I casi senza match, ambigui o con stagioni BestStore non valide o discordanti restano in <strong>Da verificare</strong> e non entrano nel CSV di aggiornamento.</p>
+    </aside>
+    <section class="results" aria-label="Risultati">
+      <div class="results-heading"><div><p class="eyebrow">RISULTATO</p><h2>Season Drop a confronto</h2></div><div class="results-actions"><p id="resultCount">0 articoli</p><button id="exportButton" class="button button-primary" disabled>↓ Scarica CSV differenze</button></div></div>
+      <div class="table-wrap"><table><thead><tr><th>SKU Magento</th><th>SKU BestStore</th><th>Season Drop<br>Magento</th><th>SEASON BST<br>BestStore</th><th>Esito</th></tr></thead><tbody id="resultsBody"></tbody></table><div id="emptyState" class="empty"><h3>Nessun articolo da mostrare</h3><p>Carica i file oppure modifica i filtri.</p></div></div>
+      <nav class="season-pagination" aria-label="Pagine risultati"><button id="previousPage" class="button button-secondary" disabled>← Precedente</button><span id="pageLabel" aria-live="polite">Pagina 0 di 0</span><button id="nextPage" class="button button-secondary" disabled>Successiva →</button></nav>
+    </section>
+  </section>
+</main>
+<script src="shared.js"></script><script src="season-core.js"></script><script src="season.js"></script>
+</body>
+</html>

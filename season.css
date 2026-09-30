@@ -1,0 +1,10 @@
+.season-note { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.season-pagination { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 16px; margin-top: 24px; font-size: 12px; }
+.season-badge { display: inline-block; border-radius: 6px; padding: 5px 8px; font-weight: 700; white-space: nowrap; }
+.season-badge.matched { background: #edf7f0; color: #0b5136; }
+.season-badge.mismatch { background: #fff1ef; color: #9a3028; }
+.season-badge.unresolved { background: #fff7e3; color: #985a08; }
+.season-detail { display: block; margin-top: 5px; font-size: 11px; color: var(--muted); }
+.results-actions { flex-wrap: wrap; }
+td { overflow-wrap: anywhere; }
+.table-wrap table { min-width: 740px; }

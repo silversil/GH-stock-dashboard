@@ -1,5 +1,15 @@
 # Stock Gap · Magento
 
+## Dashboard stagione
+
+Apri `season.html` o il collegamento **Dashboard stagione** dalle altre dashboard. Carica il CSV Magento (colonne `SKU` e `Season Drop`/`season_drop`) e l’Excel BestStore. Il primo foglio viene letto dalla riga 3: SKU in B, anno in E, stagione in F. `I`/`A` diventano `FW`, `E`/`S` diventano `SS`: ad esempio `23` + `I` → `FW23`.
+
+Il matching riutilizza le regole condivise: normalizzazione di punti e spazi, rimozione `OT-` dal CSV, match esatto, prefisso di tre caratteri e contenimento non ambiguo. I semplici senza match diretto ereditano la stagione dal padre presente nel CSV (SKU padre + trattino + taglia, prefisso più lungo). Le righe Magento `OUTLET-SS`, `OUTLET-FW` e `CORE` sono escluse dal confronto e dall’export; possono ancora identificare il padre di semplici non outlet. Anni/stagioni non validi, match ambigui e stagioni BestStore discordanti sono evidenziati come **Da verificare**, senza proporre aggiornamenti incerti.
+
+La pagina mostra **Coincidono**, **Da aggiornare**, **Da verificare** e il conteggio degli articoli OUTLET/CORE esclusi, con ricerca SKU e pagine da 100 righe. **Scarica CSV differenze** esporta tutte le differenze certe indipendentemente dai filtri, con tutte le colonne e i valori originali del CSV, aggiungendo soltanto `SEASON BST` in penultima posizione (prima di Brand nel file fornito). La colonna Season Drop originale resta invariata. I prefissi `MAIN-` e `PRE-` sono ignorati nel confronto. Gli SKU restano quelli originali Magento, ordinati Z–A, con i figli sopra il relativo padre. I file sono elaborati localmente nel browser, in un Web Worker per mantenere utilizzabile l’interfaccia durante la lettura degli Excel grandi. Servire la pagina via HTTP. La libreria SheetJS 0.18.5 è inclusa in vendor con licenza Apache 2.0, quindi la dashboard stagione non richiede CDN esterni.
+
+Verifica: `node season.test.cjs`.
+
 ## Dashboard prezzi di acquisto
 
 Apri `pmp.html` oppure il collegamento **Prezzi di acquisto** dalla dashboard originale.
