@@ -1,5 +1,5 @@
 /* global XLSX, firstSheetMatrix, text, escapeHtml, buildPmpResult, pmpExportMatrix */
-const pmpState = { magento: null, inventory: null, result: null, visible: 100, loading: 0 };
+const pmpState = { magento: null, inventory: null, result: null, visible: 100, loading: 0, selectedStores: null };
 const el = (id) => document.getElementById(id);
 const numberLabel = (value) => value.toLocaleString("it-IT", { maximumFractionDigits: 6 });
 function status(kind, title, detail) {
@@ -39,7 +39,21 @@ function parseSource(matrix, kind) {
   if (!rows.length) throw new Error("Il file non contiene righe articolo.");
   return { headers, rows, headerIndex, skuCol, priceCol, storeCol, sourceRowNumbers };
 }
+function populateStoreFilter() {
+  pmpState.selectedStores = null;
+  const inventory = pmpState.inventory;
+  const stores = inventory && inventory.storeCol >= 0 ? [...new Set(inventory.rows.map((row) => text(row[inventory.storeCol])).filter((store) => store && !isPush(store)))].sort((a, b) => a.localeCompare(b, "it")) : [];
+  el("storeFilter").innerHTML = '<option value="" selected>Tutti i negozi</option>' + stores.map((store) => `<option value="${escapeHtml(store)}">${escapeHtml(store)}</option>`).join("");
+}
+function reconcilePmp() {
+  if (!pmpState.magento || !pmpState.inventory) return;
+  pmpState.result = buildPmpResult(pmpState.magento, pmpState.inventory, pmpState.selectedStores);
+  pmpState.visible = 100;
+  const scope = pmpState.selectedStores === null ? "Tutte le righe Magento" : `Solo articoli dei ${pmpState.selectedStores.length} negozi selezionati e relativi figli; PMP calcolato solo sui negozi selezionati`;
+  status(pmpState.result.issues.length ? "warning" : "success", "Elaborazione completata", `${scope}. ${pmpState.result.issues.length} righe negozi escluse nel report. Ogni configurabile segue i propri figli.`);
+}
 function renderPmp() {
+  el("storeFilter").disabled = pmpState.loading > 0 || !pmpState.inventory || pmpState.inventory.storeCol < 0;
   el("csvInput").disabled = pmpState.loading > 0;
   el("excelInput").disabled = pmpState.loading > 0;
   const result = pmpState.result;
@@ -56,7 +70,8 @@ function renderPmp() {
   el("resultsBody").innerHTML = filtered.slice(0, pmpState.visible).map((r) => `<tr><td>${escapeHtml(r.sku)}</td><td>${escapeHtml(r.skus.join(" / ") || "—")}</td><td>${escapeHtml(r.stores.join(" / ") || "—")}</td><td class="number">${r.count}</td><td class="number"><strong>${r.price === null ? "—" : numberLabel(r.price)}</strong></td></tr>`).join("");
   el("loadMoreButton").hidden = filtered.length <= pmpState.visible;
   el("emptyState").hidden = filtered.length > 0;
-  el("exportButton").disabled = !result || pmpState.loading > 0;
+  el("exportButton").disabled = !rows.length || pmpState.loading > 0;
+  el("exportButton").textContent = pmpState.selectedStores === null ? "↓ Scarica Excel completo" : "↓ Scarica Excel negozi selezionati";
   el("reportButton").disabled = !result?.issues.length || pmpState.loading > 0;
 }
 for (const [id, kind, label] of [["csvInput", "magento", "csvFileState"], ["excelInput", "inventory", "excelFileState"]]) {
@@ -71,11 +86,10 @@ for (const [id, kind, label] of [["csvInput", "magento", "csvFileState"], ["exce
     status("loading", "Lettura file…", file.name);
     try {
       pmpState[kind] = parseSource(firstSheetMatrix(await file.arrayBuffer(), file.name, true), kind);
+      if (kind === "inventory") populateStoreFilter();
       el(label).textContent = file.name;
       if (pmpState.magento && pmpState.inventory) {
-        pmpState.result = buildPmpResult(pmpState.magento, pmpState.inventory);
-        pmpState.visible = 100;
-        status(pmpState.result.issues.length || pmpState.result.orphanSimpleCount ? "warning" : "success", "Elaborazione completata", `${pmpState.result.issues.length} righe negozi escluse e disponibili nel report; ${pmpState.result.push} righe PUSH ignorate. ${pmpState.result.orphanSimpleCount} semplici senza configurabile nel CSV: PMP vuoto. Il download include tutte le righe Magento, raggruppate per SKU da Z ad A, con ogni configurabile subito sotto i suoi figli.`);
+        reconcilePmp();
       } else status("info", "Carica il secondo file", "Servono il CSV Magento e l’Excel negozi con Costo Uni PM.");
     } catch (error) {
       el(label).textContent = "File non valido";
@@ -127,5 +141,11 @@ el("reportButton").addEventListener("click", () => {
   download([["Riga Excel", "SKU Excel", "Negozio", "PMP originale", "Motivo esclusione", "Candidati normalizzati"], ...pmpState.result.issues], "pmp-righe-escluse.xlsx", "Righe escluse");
 });
 for (const id of ["searchInput", "matchFilter"]) el(id).addEventListener("input", () => { pmpState.visible = 100; renderPmp(); });
+el("storeFilter").addEventListener("change", () => {
+  const selected = Array.from(el("storeFilter").selectedOptions, (option) => option.value);
+  pmpState.selectedStores = selected.includes("") ? null : selected;
+  reconcilePmp();
+  renderPmp();
+});
 el("loadMoreButton").addEventListener("click", () => { pmpState.visible += 100; renderPmp(); });
 renderPmp();

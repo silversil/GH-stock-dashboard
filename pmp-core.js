@@ -29,7 +29,8 @@ function parentSkuKey(sku, parents) {
   return null;
 }
 
-function buildPmpResult(magento, inventory) {
+function buildPmpResult(magento, inventory, selectedStores = null) {
+  const storeSelection = selectedStores === null ? null : new Set(selectedStores);
   const typeCol = magento.headers.findIndex((header) => /^product\s*type$/i.test(text(header)));
   const skuMap = new Map();
   const byLength = new Map();
@@ -43,16 +44,19 @@ function buildPmpResult(magento, inventory) {
   }
   const central = { skuMap, byLength, lengths: [...byLength.keys()].sort((a, b) => b - a) };
   const totals = new Map();
+  const presentKeys = new Set();
   const cache = new Map();
   const issues = [];
   let push = 0;
   inventory.rows.forEach((row, index) => {
     const sku = text(row[inventory.skuCol]);
     const store = inventory.storeCol < 0 ? "" : text(row[inventory.storeCol]);
+    if (storeSelection && !storeSelection.has(store)) return;
     if (isPush(store)) { push++; return; }
     const key = normalizeSku(sku);
     if (!cache.has(key)) cache.set(key, findCentralMatch(key, central));
     const match = cache.get(key);
+    if (match?.key) presentKeys.add(match.key);
     const price = parsePmp(row[inventory.priceCol]);
     let reason = !sku ? "SKU vuoto" : !match ? "Nessun match" : !match.key ? "Match ambiguo" : price === null ? "PMP mancante o non numerico" : "";
     if (reason) {
@@ -66,12 +70,13 @@ function buildPmpResult(magento, inventory) {
     if (store) item.stores.add(store);
     totals.set(match.key, item);
   });
-  const rows = magento.rows.map((row) => {
+  let rows = magento.rows.map((row) => {
     const kind = typeCol < 0 ? "configurable" : productKind(row[typeCol]);
     const key = kind === "simple" ? parentSkuKey(row[magento.skuCol], skuMap) : kind === "configurable" ? normalizeSku(row[magento.skuCol], true) : null;
     const item = totals.get(key);
-    return { source: row, sku: text(row[magento.skuCol]), kind, parentKey: kind === "simple" ? key : null, price: item ? item.mean : null, count: item?.count || 0, stores: [...(item?.stores || [])], skus: [...(item?.skus || [])] };
+    return { source: row, sku: text(row[magento.skuCol]), inSelectedStores: presentKeys.has(key), kind, parentKey: kind === "simple" ? key : null, price: item ? item.mean : null, count: item?.count || 0, stores: [...(item?.stores || [])], skus: [...(item?.skus || [])] };
   });
+  if (storeSelection) rows = rows.filter((row) => row.inSelectedStores);
   if (typeCol >= 0) {
     const groupKey = (row) => row.parentKey || normalizeSku(row.sku, true);
     rows.sort((a, b) => groupKey(b).localeCompare(groupKey(a), "it") ||

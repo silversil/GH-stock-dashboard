@@ -71,3 +71,5 @@ python -m http.server 8000
 Poi apri `http://localhost:8000`.
 
 L’Excel PMP blocca prima riga e prima colonna (riquadri fissi da B2), presenta le intestazioni in grassetto e colora tutta la colonna K di giallo #FFFF00. L’esportazione formattata usa ExcelJS 4.4.0 incluso in vendor con licenza MIT.
+
+Il filtro Negozi della dashboard PMP consente selezione multipla e limita sia anteprima sia download agli articoli abbinati ai negozi selezionati, con tutti i figli Magento e il configurabile. Anche la media PMP e il report delle esclusioni usano soltanto quei negozi. Gli articoli abbinati con PMP non valido restano con prezzo vuoto. Tutti i negozi ripristina l’export completo; vista e ricerca restano filtri della sola anteprima.
