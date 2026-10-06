@@ -75,3 +75,5 @@ L’Excel PMP blocca prima riga e prima colonna (riquadri fissi da B2), presenta
 Il filtro Negozi della dashboard PMP consente selezione multipla e limita sia anteprima sia download agli articoli abbinati ai negozi selezionati, con tutti i figli Magento e il configurabile. Anche la media PMP e il report delle esclusioni usano soltanto quei negozi. Gli articoli abbinati con PMP non valido restano con prezzo vuoto. Tutti i negozi ripristina l’export completo; vista e ricerca restano filtri della sola anteprima.
 
 L’ultima colonna dell’Excel PMP è Negozio: elenca i negozi abbinati all’articolo e inclusi nella selezione, separati da /, anche sui figli. Il negozio resta indicato quando il PMP è vuoto o non valido.
+
+I figli nell’Excel PMP sono ordinati per taglia crescente all’interno di ogni configurabile: XXS, XS, S, M, L, XL, 2XL, 3XL e successive; le taglie numeriche sono ordinate per valore, comprese quelle decimali. SKU originali e posizione finale del configurabile sono conservati.

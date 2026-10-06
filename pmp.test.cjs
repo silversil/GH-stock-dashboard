@@ -86,3 +86,16 @@ for (const parent of typedResult.rows.filter(r=>r.kind==='configurable')) { cons
 assert(pmpExportMatrix(typed,bari).slice(1).every(r=>r.at(-1)==='Bari'));
 assert(pmpExportMatrix(typed,invalidStore).slice(1).every(r=>r.at(-1)==='Bari'));
 assert.equal(pmpExportMatrix(typed,typedResult).find(r=>r[0]==='ABCD').at(-1),'Bari / Roma');
+
+const sizes = ['3XL','M','XS','XL','S','2XL','XXS','L','4XL','5XL'];
+const sizedMagento = {headers:['SKU','Product Type'],skuCol:0,rows:[['SHIRT','Configurable Product'],...sizes.map(s=>['SHIRT-'+s,'Simple Product']),['SHOE','Configurable Product'],...['41','39','40.5','40','9','10'].map(s=>['SHOE-'+s,'Simple Product'])]};
+const sizedResult = buildPmpResult(sizedMagento,{rows:[]});
+assert.deepEqual(sizedResult.rows.filter(r=>r.parentKey==='SHIRT').map(pmpChildSize),['XXS','XS','S','M','L','XL','2XL','3XL','4XL','5XL']);
+assert.deepEqual(sizedResult.rows.filter(r=>r.parentKey==='SHOE').map(pmpChildSize),['9','10','39','40','40.5','41']);
+for(const key of ['SHIRT','SHOE']) {
+ const parent=sizedResult.rows.findIndex(r=>r.sku===key);
+ assert.equal(sizedResult.rows[parent-1].parentKey,key);
+}
+assert.equal(pmpChildSize({sku:'OT-AB.CD-RED-40.5',parentKey:'ABCD-RED'}),'40.5');
+assert(comparePmpSizes('6-','7')<0);
+console.log('Ascending clothing and numeric sizes, decimals and parent placement passed.');

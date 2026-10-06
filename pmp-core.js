@@ -29,6 +29,34 @@ function parentSkuKey(sku, parents) {
   return null;
 }
 
+function pmpChildSize(row) {
+  if (!row.parentKey) return "";
+  // Use the original suffix: SKU normalization removes decimal points.
+  for (let i = 0; i < row.sku.length; i++) {
+    if (row.sku[i] === "-" && normalizeSku(row.sku.slice(0, i), true) === row.parentKey) return row.sku.slice(i + 1).trim();
+  }
+  return "";
+}
+function comparePmpSizes(left, right) {
+  const describe = (value) => {
+    let label = text(value).toUpperCase().replace(/\s/g, "");
+    if (/^\d+-$/.test(label)) label = label.slice(0, -1) + ".5";
+    if (/^\d+(?:[.,]\d+)?$/.test(label)) return [0, Number(label.replace(",", ".")), label];
+    const aliases = { SM: "S", MD: "M", LG: "L", LXL: "L/XL" };
+    label = aliases[label] || label;
+    const base = { S: 0, "S/M": 0.5, M: 1, "M/L": 1.5, L: 2, "L/XL": 2.5 };
+    if (Object.hasOwn(base, label)) return [1, base[label], label];
+    const extended = label.match(/^(X+|\d+X)(S|L)$/);
+    if (extended) {
+      const count = /^\d/.test(extended[1]) ? Number(extended[1].slice(0, -1)) : extended[1].length;
+      return [1, extended[2] === "S" ? -count : 2 + count, label];
+    }
+    return [2, 0, label];
+  };
+  const a = describe(left), b = describe(right);
+  return a[0] - b[0] || a[1] - b[1] || a[2].localeCompare(b[2], "it", { numeric: true });
+}
+
 function buildPmpResult(magento, inventory, selectedStores = null) {
   const storeSelection = selectedStores === null ? null : new Set(selectedStores);
   const typeCol = magento.headers.findIndex((header) => /^product\s*type$/i.test(text(header)));
@@ -86,6 +114,7 @@ function buildPmpResult(magento, inventory, selectedStores = null) {
     const groupKey = (row) => row.parentKey || normalizeSku(row.sku, true);
     rows.sort((a, b) => groupKey(b).localeCompare(groupKey(a), "it") ||
       Number(a.kind === "configurable") - Number(b.kind === "configurable") ||
+      comparePmpSizes(pmpChildSize(a), pmpChildSize(b)) ||
       b.sku.localeCompare(a.sku, "it"));
   }
   return { rows, issues, push, orphanSimpleCount: rows.filter((row) => row.kind === "simple" && !row.parentKey).length };
