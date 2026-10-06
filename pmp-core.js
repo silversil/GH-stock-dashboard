@@ -45,6 +45,7 @@ function buildPmpResult(magento, inventory, selectedStores = null) {
   const central = { skuMap, byLength, lengths: [...byLength.keys()].sort((a, b) => b - a) };
   const totals = new Map();
   const presentKeys = new Set();
+  const matchedStores = new Map();
   const cache = new Map();
   const issues = [];
   let push = 0;
@@ -56,7 +57,11 @@ function buildPmpResult(magento, inventory, selectedStores = null) {
     const key = normalizeSku(sku);
     if (!cache.has(key)) cache.set(key, findCentralMatch(key, central));
     const match = cache.get(key);
-    if (match?.key) presentKeys.add(match.key);
+    if (match?.key) {
+      presentKeys.add(match.key);
+      if (!matchedStores.has(match.key)) matchedStores.set(match.key, new Set());
+      if (store) matchedStores.get(match.key).add(store);
+    }
     const price = parsePmp(row[inventory.priceCol]);
     let reason = !sku ? "SKU vuoto" : !match ? "Nessun match" : !match.key ? "Match ambiguo" : price === null ? "PMP mancante o non numerico" : "";
     if (reason) {
@@ -74,7 +79,7 @@ function buildPmpResult(magento, inventory, selectedStores = null) {
     const kind = typeCol < 0 ? "configurable" : productKind(row[typeCol]);
     const key = kind === "simple" ? parentSkuKey(row[magento.skuCol], skuMap) : kind === "configurable" ? normalizeSku(row[magento.skuCol], true) : null;
     const item = totals.get(key);
-    return { source: row, sku: text(row[magento.skuCol]), inSelectedStores: presentKeys.has(key), kind, parentKey: kind === "simple" ? key : null, price: item ? item.mean : null, count: item?.count || 0, stores: [...(item?.stores || [])], skus: [...(item?.skus || [])] };
+    return { source: row, sku: text(row[magento.skuCol]), inSelectedStores: presentKeys.has(key), kind, parentKey: kind === "simple" ? key : null, price: item ? item.mean : null, count: item?.count || 0, stores: [...(matchedStores.get(key) || [])].sort((a, b) => a.localeCompare(b, "it")), skus: [...(item?.skus || [])] };
   });
   if (storeSelection) rows = rows.filter((row) => row.inSelectedStores);
   if (typeCol >= 0) {
@@ -87,8 +92,8 @@ function buildPmpResult(magento, inventory, selectedStores = null) {
 }
 
 function pmpExportMatrix(magento, result) {
-  return [[...magento.headers, "PMP NEGOZI"], ...result.rows.map((row) => [...Array.from({ length: magento.headers.length }, (_, i) => {
+  return [[...magento.headers, "PMP NEGOZI", "Negozio"], ...result.rows.map((row) => [...Array.from({ length: magento.headers.length }, (_, i) => {
     const value = row.source[i] ?? "";
     return i >= 2 && i <= 5 ? parsePmp(value) ?? value : value;
-  }), row.price ?? ""])];
+  }), row.price ?? "", (row.stores || []).join(" / ")])];
 }

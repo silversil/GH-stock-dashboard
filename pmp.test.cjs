@@ -20,8 +20,8 @@ assert.equal(result.push, 1);
 assert.equal(result.issues[1][4], 'Match ambiguo');
 const matrix = pmpExportMatrix(magento, result);
 assert.equal(matrix.length, magento.rows.length + 1);
-assert.deepEqual(matrix[0], [...magento.headers, 'PMP NEGOZI']);
-for (let i = 0; i < magento.rows.length; i++) assert.deepEqual(matrix[i + 1].slice(0, -1), magento.rows[i]);
+assert.deepEqual(matrix[0], [...magento.headers, 'PMP NEGOZI', 'Negozio']);
+for (let i = 0; i < magento.rows.length; i++) assert.deepEqual(matrix[i + 1].slice(0, -2), magento.rows[i]);
 assert.equal(matrix[3][3], '');
 // Original dashboard still delegates to the same matcher via its default state.
 global.state = { central: { skuMap: new Map([['ABCD', true]]), byLength: new Map([[4, new Set(['ABCD'])]]), lengths: [4] } };
@@ -75,10 +75,14 @@ assert.equal(prices.get('ABCDX-S'), null);
 assert.equal(typedResult.orphanSimpleCount, 2);
 assert.deepEqual(typedResult.rows.map(row => row.kind), ['simple', 'simple', 'simple', 'configurable', 'simple', 'configurable']);
 const typedExport = pmpExportMatrix(typed, typedResult);
-assert.deepEqual(typedExport[0], [...typed.headers, 'PMP NEGOZI']);
-for (const row of typedExport.slice(1)) { const source = typed.rows.find(source => source[0] === row[0]); assert.deepEqual(row.slice(0, -1), [source[0], source[1], parsePmp(source[2])]); }
+assert.deepEqual(typedExport[0], [...typed.headers, 'PMP NEGOZI', 'Negozio']);
+for (const row of typedExport.slice(1)) { const source = typed.rows.find(source => source[0] === row[0]); assert.deepEqual(row.slice(0, -2), [source[0], source[1], parsePmp(source[2])]); }
 console.log('Configurable inheritance, longest parent, orphan handling, zero price, original columns and type Z-A ordering passed.');
 
 const money = pmpExportMatrix({headers:['SKU','Margine','C','D','E','F']}, {rows:[{source:['001','47.81%','€12.80','€1.234,56','','€0.00'],price:10}]});
-assert.deepEqual(money[1], ['001','47.81%',12.8,1234.56,'',0,10]);
+assert.deepEqual(money[1], ['001','47.81%',12.8,1234.56,'',0,10,'']);
 for (const parent of typedResult.rows.filter(r=>r.kind==='configurable')) { const children=typedResult.rows.filter(r=>r.parentKey===normalizeSku(parent.sku,true)); const end=typedResult.rows.indexOf(parent); assert.deepEqual(typedResult.rows.slice(end-children.length,end),children); }
+
+assert(pmpExportMatrix(typed,bari).slice(1).every(r=>r.at(-1)==='Bari'));
+assert(pmpExportMatrix(typed,invalidStore).slice(1).every(r=>r.at(-1)==='Bari'));
+assert.equal(pmpExportMatrix(typed,typedResult).find(r=>r[0]==='ABCD').at(-1),'Bari / Roma');
