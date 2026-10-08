@@ -134,7 +134,8 @@ async function download(matrix, name, sheetName, priceCol = -1) {
 }
 el("exportButton").addEventListener("click", () => {
   if (!pmpState.result) return;
-  download(pmpExportMatrix(pmpState.magento, pmpState.result), "magento-prezzi-acquisto.xlsx", "Magento", pmpState.magento.headers.length);
+  const matrix = pmpExportMatrix(pmpState.magento, pmpState.result);
+  download(matrix, "magento-prezzi-acquisto.xlsx", "Magento", matrix[0].indexOf("PMP NEGOZI"));
 });
 el("reportButton").addEventListener("click", () => {
   if (!pmpState.result) return;

@@ -121,8 +121,10 @@ function buildPmpResult(magento, inventory, selectedStores = null) {
 }
 
 function pmpExportMatrix(magento, result) {
-  return [[...magento.headers, "PMP NEGOZI", "Negozio"], ...result.rows.map((row) => [...Array.from({ length: magento.headers.length }, (_, i) => {
+  const brandCol = magento.headers.findIndex((header) => /^(brand|marca)$/i.test(text(header)));
+  const columns = magento.headers.map((_, i) => i).filter((i) => i !== brandCol);
+  return [[...columns.map((i) => magento.headers[i]), "PMP NEGOZI", "Brand", "Negozio"], ...result.rows.map((row) => [...columns.map((i) => {
     const value = row.source[i] ?? "";
     return i >= 2 && i <= 5 ? parsePmp(value) ?? value : value;
-  }), row.price ?? "", (row.stores || []).join(" / ")])];
+  }), row.price ?? "", brandCol < 0 ? "" : row.source[brandCol] ?? "", (row.stores || []).join(" / ")])];
 }
