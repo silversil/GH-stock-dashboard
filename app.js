@@ -12,7 +12,7 @@ const CLOTHING_SIZE_ALIASES = new Map([
   ["ONESIZE", "OS"], ["OSFA", "OS"]
 ]);
 
-const state = { excel: null, central: null, catalog: null, rows: [], stores: [], brands: [], diagnostics: null, visible: PAGE_SIZE };
+const state = { excel: null, central: null, catalog: null, rows: [], stores: [], selectedStores: new Set(), brands: [], diagnostics: null, visible: PAGE_SIZE };
 const ui = Object.fromEntries([
   "status", "diagnosticsPanel", "diagnosticsText", "excelInput", "csvInput", "catalogInput", "excelFileState", "csvFileState", "catalogFileState", "storeFilter", "brandFilter",
   "matchFilter", "minPieces", "searchInput", "sortFilter", "resetButton", "resultsBody", "emptyState", "resultsTitle",
@@ -302,13 +302,13 @@ function reconcile() {
 }
 
 function filters() {
-  return { match: ui.matchFilter.value, store: ui.storeFilter.value, brand: ui.brandFilter.value, min: Math.max(1, Number(ui.minPieces.value) || 1), search: ui.searchInput.value.trim().toLocaleLowerCase("it"), sort: ui.sortFilter.value };
+  return { match: ui.matchFilter.value, stores: new Set(state.selectedStores), brand: ui.brandFilter.value, min: Math.max(1, Number(ui.minPieces.value) || 1), search: ui.searchInput.value.trim().toLocaleLowerCase("it"), sort: ui.sortFilter.value };
 }
 function filteredRows() {
   const active = filters();
   const rows = state.rows.filter((row) =>
     (active.match === "all" || row.matchStatus === active.match) &&
-    (active.store === "all" || row.store === active.store) &&
+    (!active.stores.size || active.stores.has(row.store)) &&
     (active.brand === "all" || row.brand === active.brand) &&
     row.qty >= active.min &&
     (!active.search || `${row.sku} ${row.csvSku} ${row.description} ${row.brand}`.toLocaleLowerCase("it").includes(active.search))
@@ -467,10 +467,13 @@ function render() {
   ui.loadMoreButton.hidden = visible.length >= rows.length;
 }
 function populateFilters() {
-  const currentStore = state.stores.includes(ui.storeFilter.value) ? ui.storeFilter.value : "all";
-  ui.storeFilter.innerHTML = `<option value="all">Tutti i negozi</option>${state.stores.map((store) => `<option value="${escapeHtml(store)}">${escapeHtml(compactStore(store))}</option>`).join("")}`;
-  ui.storeFilter.value = currentStore;
+  state.selectedStores = new Set([...state.selectedStores].filter((store) => state.stores.includes(store)));
+  renderStoreFilter();
   populateBrandFilter();
+}
+function renderStoreFilter() {
+  const allSelected = state.selectedStores.size === 0;
+  ui.storeFilter.innerHTML = `<label class="store-option store-option-all"><input type="checkbox" value="all"${allSelected ? " checked" : ""}> Tutti i negozi</label>${state.stores.map((store) => `<label class="store-option" title="${escapeHtml(store)}"><input type="checkbox" value="${escapeHtml(store)}"${state.selectedStores.has(store) ? " checked" : ""}> <span>${escapeHtml(compactStore(store))}</span></label>`).join("")}`;
 }
 function populateBrandFilter() {
   const relevantBrands = ui.matchFilter.value === "missing" || ui.matchFilter.value === "ambiguous" ? [] : state.brands;
@@ -520,9 +523,23 @@ ui.catalogInput.addEventListener("change", async (event) => {
   event.target.value = "";
 });
 ui.matchFilter.addEventListener("input", () => { state.visible = PAGE_SIZE; populateBrandFilter(); render(); });
-[ui.storeFilter, ui.brandFilter, ui.minPieces, ui.searchInput, ui.sortFilter].forEach((control) => control.addEventListener("input", () => { state.visible = PAGE_SIZE; render(); }));
+[ui.brandFilter, ui.minPieces, ui.searchInput, ui.sortFilter].forEach((control) => control.addEventListener("input", () => { state.visible = PAGE_SIZE; render(); }));
+ui.storeFilter.addEventListener("change", (event) => {
+  const input = event.target.closest('input[type="checkbox"]');
+  if (!input) return;
+  if (input.value === "all") {
+    state.selectedStores.clear();
+  } else if (input.checked) {
+    state.selectedStores.add(input.value);
+  } else {
+    state.selectedStores.delete(input.value);
+  }
+  state.visible = PAGE_SIZE;
+  renderStoreFilter();
+  render();
+});
 ui.resetButton.addEventListener("click", () => {
-  ui.matchFilter.value = "missing"; ui.storeFilter.value = "all"; ui.brandFilter.value = "all"; ui.minPieces.value = "1"; ui.searchInput.value = ""; ui.sortFilter.value = "qty-desc"; state.visible = PAGE_SIZE; populateBrandFilter(); render();
+  ui.matchFilter.value = "missing"; state.selectedStores.clear(); ui.brandFilter.value = "all"; ui.minPieces.value = "1"; ui.searchInput.value = ""; ui.sortFilter.value = "qty-desc"; state.visible = PAGE_SIZE; renderStoreFilter(); populateBrandFilter(); render();
 });
 ui.loadMoreButton.addEventListener("click", () => { state.visible += PAGE_SIZE; render(); });
 ui.exportButton.addEventListener("click", exportFilteredRows);

@@ -61,11 +61,18 @@ h1 span { color: var(--green); font-style: italic; }
 .filters { padding: 24px 20px; border-right: 1px solid var(--line); background: #fbfcfb; }
 .section-heading, .range-heading { display: flex; align-items: center; justify-content: space-between; }
 .section-heading button { border: 0; background: transparent; color: var(--green); font-size: 12px; font-weight: 750; }
-.filters label { display: block; margin: 22px 0 8px; font-size: 12px; font-weight: 750; }
+.filters > label, .filters .filter-label { display: block; margin: 22px 0 8px; font-size: 12px; font-weight: 750; }
 .range-heading label { margin-bottom: 6px; }
 .range-heading output { min-width: 32px; padding: 3px 8px; border-radius: 12px; background: var(--ink); color: white; font-size: 12px; font-weight: 800; text-align: center; }
 select, input[type="number"], .search-wrap { width: 100%; min-height: 42px; border: 1px solid #ccd7d0; border-radius: 7px; background: white; color: var(--ink); }
 select { padding: 0 34px 0 11px; }
+.store-multi { width: 100%; max-height: 184px; overflow-y: auto; border: 1px solid #ccd7d0; border-radius: 7px; background: white; }
+.store-multi:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px rgba(31, 122, 77, .12); }
+.store-option { display: flex; align-items: center; gap: 8px; margin: 0 !important; padding: 8px 10px; border-bottom: 1px solid #edf1ee; font-size: 12px !important; font-weight: 600 !important; cursor: pointer; }
+.store-option:last-child { border-bottom: 0; }
+.store-option:hover { background: #f4f8f5; }
+.store-option-all { position: sticky; top: 0; z-index: 1; background: #f7faf8; color: var(--green-dark); font-weight: 800 !important; }
+.store-option input { flex: 0 0 auto; margin: 0; accent-color: var(--green); }
 input[type="number"] { padding: 0 11px; }
 .search-wrap { display: flex; align-items: center; gap: 7px; padding: 0 10px; }
 .search-wrap span { color: var(--muted); font-size: 20px; }
