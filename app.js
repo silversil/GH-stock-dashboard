@@ -241,7 +241,7 @@ function reconcile() {
   const uniqueSkus = new Map();
   for (const row of state.excel.rows) if (!uniqueSkus.has(row.skuKey)) uniqueSkus.set(row.skuKey, row);
   const matchCache = new Map();
-  const methods = { exact: 0, prefix3: 0, contains: 0 };
+  const methods = { exact: 0, brandAlias: 0, prefix3: 0, contains: 0 };
   const ambiguous = [];
 
   for (const row of uniqueSkus.values()) {
@@ -281,10 +281,10 @@ function reconcile() {
   state.diagnostics = { methods, ambiguous, uniqueExcelSkus: uniqueSkus.size };
   populateFilters();
 
-  const matched = methods.exact + methods.prefix3 + methods.contains;
+  const matched = methods.exact + methods.brandAlias + methods.prefix3 + methods.contains;
   const absentSkus = new Set(state.rows.filter((row) => row.matchStatus === "missing").map((row) => row.skuKey)).size;
   const exactNote = methods.exact === 0 ? " (normale se l’Excel aggiunge sempre un prefisso)" : "";
-  ui.diagnosticsText.textContent = `Totale riconosciuto: ${matched.toLocaleString("it-IT")} · ${methods.exact.toLocaleString("it-IT")} coincidenze esatte dopo normalizzazione${exactNote} · ${methods.prefix3.toLocaleString("it-IT")} con prefisso di 3 caratteri · ${methods.contains.toLocaleString("it-IT")} contenuti come varianti · ${absentSkus.toLocaleString("it-IT")} assenti · ${ambiguous.length.toLocaleString("it-IT")} ambigui · ${state.central.otRows.toLocaleString("it-IT")} righe CSV con OT- normalizzato · ${state.central.brandConflicts.toLocaleString("it-IT")} SKU CSV con Brand discordanti`;
+  ui.diagnosticsText.textContent = `Totale riconosciuto: ${matched.toLocaleString("it-IT")} · ${methods.exact.toLocaleString("it-IT")} coincidenze esatte dopo normalizzazione${exactNote} · ${methods.brandAlias.toLocaleString("it-IT")} alias The North Face NFC0→NF0 · ${methods.prefix3.toLocaleString("it-IT")} con prefisso di 3 caratteri · ${methods.contains.toLocaleString("it-IT")} contenuti come varianti · ${absentSkus.toLocaleString("it-IT")} assenti · ${ambiguous.length.toLocaleString("it-IT")} ambigui · ${state.central.otRows.toLocaleString("it-IT")} righe CSV con OT- normalizzato · ${state.central.brandConflicts.toLocaleString("it-IT")} SKU CSV con Brand discordanti`;
   ui.diagnosticsPanel.hidden = false;
   const catalogNote = state.catalog
     ? `Anagrafica pronta: ${state.catalog.skuMap.size.toLocaleString("it-IT")} SKU; ${state.catalog.ignoredMissingBarcode.toLocaleString("it-IT")} righe senza barcode escluse; ${state.catalog.skusWithoutExportableChildren.toLocaleString("it-IT")} SKU con sola riga padre.`

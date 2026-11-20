@@ -9,6 +9,13 @@ function normalizeSku(value, removeOt = false) {
   return normalized;
 }
 
+function brandSkuAliases(excelSkuKey) {
+  const aliases = [];
+  // The North Face: BestSeller/BST usa NFC0..., mentre Magento usa NF0....
+  if (/^NFC0/.test(excelSkuKey)) aliases.push(excelSkuKey.replace(/^NFC0/, "NF0"));
+  return aliases;
+}
+
 function escapeHtml(value) {
   return text(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
 }
@@ -43,6 +50,9 @@ function firstSheetMatrix(arrayBuffer, fileName, keepBlankRows = false) {
 function findCentralMatch(excelSkuKey, central = state.central) {
   const { skuMap, byLength, lengths } = central;
   if (skuMap.has(excelSkuKey)) return { key: excelSkuKey, method: "exact", ambiguous: [] };
+  for (const alias of brandSkuAliases(excelSkuKey)) {
+    if (skuMap.has(alias)) return { key: alias, method: "brandAlias", ambiguous: [] };
+  }
   const withoutPrefix = excelSkuKey.slice(3);
   if (withoutPrefix && skuMap.has(withoutPrefix)) return { key: withoutPrefix, method: "prefix3", ambiguous: [] };
 

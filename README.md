@@ -56,7 +56,7 @@ Il file anagrafica può essere CSV o Excel. La dashboard individua anche un’in
 
 Il collegamento tra Excel negozi e anagrafica usa lo SKU esatto senza distinzione tra maiuscole e minuscole. Punti e spazi interni vengono preservati, così codici distinti come `NBLNBML574OB.D` e `NBLNBML574OBD` non vengono fusi.
 
-Per il confronto, spazi e punti vengono rimossi da entrambi i codici e `OT-` viene rimosso dagli SKU del CSV. La dashboard riconosce match identici, SKU Magento precedute dal comune prefisso di tre caratteri nell’Excel e, come fallback, SKU Magento contenute nel codice Excel. I match multipli della stessa lunghezza sono considerati ambigui e hanno una vista dedicata.
+Per il confronto, spazi e punti vengono rimossi da entrambi i codici e `OT-` viene rimosso dagli SKU del CSV. La dashboard riconosce match identici, la convenzione The North Face `NFC0…` nell’Excel ↔ `NF0…` in Magento, SKU Magento precedute dal comune prefisso di tre caratteri nell’Excel e, come fallback, SKU Magento contenute nel codice Excel. I match multipli della stessa lunghezza sono considerati ambigui e hanno una vista dedicata.
 
 “0 identici senza prefisso” non significa che non sia stato trovato alcun match: significa solo che nessun codice Excel coincide carattere per carattere con quello CSV dopo la normalizzazione. Il totale riconosciuto comprende anche i match ottenuti togliendo il prefisso di tre lettere e quelli contenuti come varianti.
 
